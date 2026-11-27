@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: npm dist-tag for a manual prerelease from main
+        required: false
+        default: alpha
+        type: choice
+        options:
+          - alpha
+          - beta
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'slowickip/c4spec' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Create or update Version Packages PR, or publish release
+        id: changesets
+        uses: changesets/action@v2.1.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-script: npm run version:ci
+          publish-script: npm run release:ci
+          pr-title: 'chore(release): version packages'
+          create-github-releases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  prerelease:
+    if: github.repository == 'slowickip/c4spec' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Compute prerelease version
+        id: version
+        env:
+          DIST_TAG: ${{ inputs.tag || 'alpha' }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force origin
+          npx changeset status --output=changeset-status.json
+          NEXT=$(node -p "JSON.parse(require('fs').readFileSync('changeset-status.json','utf8')).releases[0]?.newVersion ?? ''")
+          rm -f changeset-status.json
+          if [ -z "$NEXT" ]; then
+            echo "No pending changesets on main; nothing to cut a prerelease from."
+            exit 1
+          fi
+          N=1
+          while true; do
+            VERSION="${NEXT}-${DIST_TAG}.${N}"
+            TAG="@slowickip/c4spec@${VERSION}"
+            if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && \
+               ! npm view "@slowickip/c4spec@${VERSION}" version >/dev/null 2>&1; then
+              break
+            fi
+            N=$((N + 1))
+          done
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set prerelease version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: npm version "$VERSION" --no-git-tag-version
+
+      - name: Verify packed CLI version
+        run: npm run check:pack-version
+
+      - name: Publish prerelease to npm via trusted publishing
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DIST_TAG: ${{ inputs.tag || 'alpha' }}
+        run: |
+          if npm view "@slowickip/c4spec@${VERSION}" version >/dev/null 2>&1; then
+            echo "@slowickip/c4spec@${VERSION} is already on npm; skipping publish."
+            exit 0
+          fi
+          npm publish --tag "$DIST_TAG"
+
+      - name: Tag and create GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          DIST_TAG: ${{ inputs.tag || 'alpha' }}
+        run: |
+          set -euo pipefail
+          git tag "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" \
+            --prerelease \
+            --generate-notes \
+            --title "$TAG" \
+            --notes "Prerelease. Install with \`npm install -g @slowickip/c4spec@${DIST_TAG}\`."

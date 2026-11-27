@@ -17,16 +17,20 @@ later in the 22.x line**, **24.x**, or **26.x**.
 
 ## Install and try the CLI
 
-Build and install the CLI from the public repository.
+Install the CLI globally from npm:
 
 ```bash
-git clone https://github.com/slowickip/c4spec.git
-cd c4spec
-npm ci
-npm run build
-npm install --global .
+npm install -g @slowickip/c4spec@latest
 c4spec version
 ```
+
+Or run without a global install:
+
+```bash
+npx @slowickip/c4spec@latest init --agent codex
+```
+
+To build and install from a source checkout instead, see [Contributing](CONTRIBUTING.md#build-and-test).
 
 From the project whose architecture you want to maintain, choose a skill profile.
 
