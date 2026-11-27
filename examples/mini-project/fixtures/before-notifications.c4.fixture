@@ -1,0 +1,41 @@
+specification {
+  element person {
+    notation 'Person'
+  }
+  element system {
+    notation 'Software System'
+  }
+  element container {
+    notation 'Container'
+  }
+}
+
+model {
+  customer = person 'Customer' {
+    description 'Uses the online shop'
+  }
+
+  shop = system 'Online Shop' {
+    description 'Allows customers to buy products'
+
+    api = container 'Shop API' {
+      technology 'Python'
+      description 'Handles customer requests and product reads'
+    }
+
+    db = container 'Product Database' {
+      technology 'PostgreSQL'
+      description 'Stores products and purchase data'
+    }
+  }
+
+  customer -> shop.api 'Browses products' 'HTTPS'
+  shop.api -> shop.db 'Reads and writes products' 'SQL'
+}
+
+views {
+  view shop-overview {
+    title 'Online Shop — container overview'
+    include customer, shop.api, shop.db
+  }
+}

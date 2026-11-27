@@ -1,0 +1,144 @@
+name: LikeC4 PR diagram changes
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    # No path filter: a push that reverts the last diagram change must clear
+    # the comment. The PR merge checkout supplies both event commits.
+    # Forks can download the renders from this read-only job.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --omit=dev
+      - name: Compare the PR's rendered LikeC4 diagrams
+        id: compare
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/pr_model_diff.py --base "$PR_BASE" --head "$PR_HEAD" \
+            --repo "$GITHUB_REPOSITORY" --pr "$PR_NUMBER" --run-id "$GITHUB_RUN_ID" \
+            --compiler "$GITHUB_WORKSPACE/node_modules/.bin/likec4" \
+            --model-dir architecture --model-dir examples/mini-project/architecture \
+            --model-dir .agents/skills/c4spec/references/likec4/example \
+            --out "$RUNNER_TEMP/c4spec-pr-model-diff"
+          if test -f "$RUNNER_TEMP/c4spec-pr-model-diff/diagrams.md"; then
+            echo 'has_diagrams=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Render downloadable PNG diagrams
+        if: steps.compare.outputs.has_diagrams == 'true'
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+        run: |
+          set -euo pipefail
+          PUPPETEER_EXECUTABLE_PATH="$(command -v google-chrome)"
+          export PUPPETEER_EXECUTABLE_PATH
+          source="$RUNNER_TEMP/c4spec-pr-model-diff"
+          rendered="$RUNNER_TEMP/c4spec-rendered-diagrams"
+          mkdir -p "$rendered"
+          cp "$source/diagrams.md" "$rendered/diagrams.md"
+          while IFS= read -r name; do
+            npm exec --yes --package @mermaid-js/mermaid-cli@12.2.0 -- mmdc \
+              -i "$source/$name.mmd" -o "$rendered/$name.png" -b white --scale 2 < /dev/null
+          done < "$source/diagram-names.txt"
+      - uses: actions/upload-artifact@v4
+        if: steps.compare.outputs.has_diagrams == 'true'
+        with:
+          name: c4spec-rendered-diagrams
+          path: ${{ runner.temp }}/c4spec-rendered-diagrams/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Summarize diagram review
+        env:
+          HAS_DIAGRAMS: ${{ steps.compare.outputs.has_diagrams }}
+        run: |
+          if [ "$HAS_DIAGRAMS" = true ]; then
+            echo 'Download **c4spec-rendered-diagrams** from the artifacts on this run.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No visible LikeC4 diagram changes.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          name: c4spec-pr-model-diff
+          path: |
+            ${{ runner.temp }}/c4spec-pr-model-diff/comment.md
+            ${{ runner.temp }}/c4spec-pr-model-diff/metadata.json
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    # This job treats the artifact as data, with no checkout or PR code.
+    # Same-repo PRs can change this workflow itself, as with the prior publisher.
+    needs: prepare
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    concurrency:
+      group: native-diff-review-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: c4spec-pr-model-diff
+          path: ${{ runner.temp }}/c4spec-pr-model-diff/
+      - name: Update or clear the bot's visual LikeC4 comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          folder="$RUNNER_TEMP/c4spec-pr-model-diff"
+          note="$folder/comment.md"
+          marker='<!-- c4spec-native-likec4-diff-review -->'
+          bytes="$(wc -c < "$note" | tr -d '[:space:]')"
+          test "$bytes" -le 60000
+          jq -e --arg repo "$GH_REPO" --argjson pr "$PR_NUMBER" \
+            --argjson run "$GITHUB_RUN_ID" --arg base "$PR_BASE" --arg head "$PR_HEAD" \
+            --argjson bytes "$bytes" \
+            '.repo == $repo and .pr == $pr and .runId == $run and
+             .base == $base and .head == $head and .commentBytes == $bytes' \
+            "$folder/metadata.json" >/dev/null
+          if [ "$bytes" -gt 0 ]; then
+            test "$(sed -n '1p' "$note")" = "$marker"
+            grep -qF "$PR_HEAD" "$note"
+            grep -Fxq "[Download rendered diagrams](https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID#artifacts)" "$note"
+          fi
+
+          existing="$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- c4spec-native-likec4-diff-review -->"))) | .id' \
+            | sed -n '1p')"
+          if [ "$bytes" -eq 0 ] && [ -z "$existing" ]; then
+            exit 0
+          fi
+          live="$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER" --jq '[.state, .base.sha, .head.sha] | join(" ")')"
+          if [ "$live" != "open $PR_BASE $PR_HEAD" ]; then
+            echo "::notice::The PR changed while this run was in progress"
+            exit 0
+          fi
+          if [ "$bytes" -eq 0 ]; then
+            gh api --method DELETE "repos/$GH_REPO/issues/comments/$existing" >/dev/null
+          elif [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$GH_REPO/issues/comments/$existing" -F "body=@$note" >/dev/null
+          else
+            gh api --method POST "repos/$GH_REPO/issues/$PR_NUMBER/comments" -F "body=@$note" >/dev/null
+          fi

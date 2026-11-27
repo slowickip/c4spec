@@ -1,0 +1,73 @@
+specification {
+  element person {
+    notation 'Person'
+  }
+  element system {
+    notation 'Software system'
+  }
+  element container {
+    notation 'Container'
+  }
+}
+
+model {
+  contributor = person 'Contributor' {
+    description 'Requests diagram maintenance or proposes architecture changes, runs checks and reviews the resulting model in Git.'
+  }
+
+  c4spec = system 'C4Spec' {
+    description 'Helps people and agents maintain current-state diagrams and develop architecture changes in the repository that owns the model.'
+
+    cli = container 'C4Spec CLI' {
+      technology 'TypeScript on Node.js'
+      description 'Sets up projects with a choice of skill profile, previews skill upgrades, validates models and builds review evidence from committed architecture.'
+    }
+
+    prReview = container 'Pull request diagram review' {
+      technology 'GitHub Actions and Python'
+      description 'Compares rendered diagrams and attaches PNGs to pull request runs. Manages the visual comment on pull requests from branches in the same repository.'
+    }
+  }
+
+  codingAgent = system 'Coding agent' {
+    description 'Uses C4Spec skills to review and maintain diagrams or to propose and verify changes in the contributor’s repository.'
+  }
+
+  git = system 'Git' {
+    description 'Stores model revisions and provides the merge base, source patches and committed model files.'
+  }
+
+  likec4 = system 'LikeC4' {
+    description 'Compiles models, calculates views, previews native changes and renders diagrams.'
+  }
+
+  github = system 'GitHub' {
+    description 'Hosts repositories, pull requests, human reviews and CI results.'
+  }
+
+  contributor -> c4spec.cli 'Sets up and checks a model, then builds review artifacts' 'CLI'
+  contributor -> codingAgent 'Requests design and implementation assistance'
+  contributor -> github 'Reviews the proposed and implemented changes' 'HTTPS'
+  codingAgent -> c4spec 'Loads modeling and development guidance' 'Skill files'
+  codingAgent -> c4spec.cli 'Runs model checks and prepares reviews' 'CLI'
+  c4spec.cli -> git 'Reads exact revisions and their model source patches' 'Git CLI'
+  c4spec.cli -> likec4 'Compiles models, rehearses native changes and builds viewers' 'Pinned LikeC4 CLI'
+  github -> c4spec.prReview 'Triggers diagram review when a pull request changes' 'Pull request event'
+  c4spec.prReview -> git 'Reads committed models at the merge base and head' 'Git CLI'
+  c4spec.prReview -> likec4 'Renders committed diagrams for comparison' 'Pinned LikeC4 CLI'
+  c4spec.prReview -> github 'Uploads diagram artifacts and manages comments on same-repository pull requests' 'GitHub API'
+}
+
+views {
+  view index {
+    title 'L1 — C4Spec system context'
+    description 'Shows who uses C4Spec and the software systems it relies on.'
+    include contributor, c4spec, codingAgent, git, likec4, github
+  }
+
+  view containers of c4spec {
+    title 'L2 — C4Spec CLI and pull request review'
+    description 'Shows the local CLI and hosted diagram-review workflow and their different dependencies.'
+    include *
+  }
+}

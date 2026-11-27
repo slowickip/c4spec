@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "expire-cache-entries",
+  "intent": "Bound how long a cached product read may be served, without touching the architecture: the cache is an implementation detail of shop.api, not a new container.",
+  "scope": [
+    "shop.api"
+  ],
+  "constraints": [
+    {
+      "id": "cache-ttl-bound",
+      "statement": "A cached product read MUST NOT be served when its entry age exceeds 300 seconds.",
+      "durability": "persistent",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_order_cache.py"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "element": "shop.api",
+      "path": "tests/test_order_cache.py",
+      "state": "declared",
+      "note": "Test source exists at this path. Run the 6 unittest cases in CI or during verification and report the exact run result separately; presence of this file alone is not evidence that tests passed."
+    }
+  ]
+}

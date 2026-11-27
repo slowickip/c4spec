@@ -1,0 +1,59 @@
+specification {
+  element person {
+    notation 'Person'
+  }
+  element system {
+    notation 'Software System'
+  }
+  element container {
+    notation 'Container'
+  }
+}
+
+model {
+  customer = person 'Customer' {
+    description 'Uses the online shop'
+  }
+
+  shop = system 'Online Shop' {
+    description 'Allows customers to buy products'
+
+    api = container 'Shop API' {
+      technology 'Python'
+      description 'Handles customer requests and product reads'
+    }
+
+    db = container 'Product Database' {
+      technology 'PostgreSQL'
+      description 'Stores products and purchase data'
+    }
+
+    broker = container 'Message Broker' {
+      technology 'RabbitMQ'
+      description 'Runs the durable message broker; stores order events for asynchronous notification delivery'
+    }
+
+    worker = container 'Notification Worker' {
+      technology 'Python (queue consumer)'
+      description 'Consumes order events and sends customer notifications with retries and backoff, outside the request path'
+    }
+  }
+
+  customer -> shop.api 'Browses products' 'HTTPS'
+  shop.api -> shop.db 'Reads and writes products' 'SQL'
+  shop.api -> shop.broker 'Publishes order events' 'AMQP'
+  shop.broker -> shop.worker 'Provides order events for consumption' 'AMQP'
+  shop.worker -> customer 'Sends order notifications' 'email'
+}
+
+views {
+  view shop-overview {
+    title 'L2 — Online Shop: container overview'
+    include customer, shop.api, shop.db, shop.broker, shop.worker
+  }
+
+  view notifications {
+    title 'L2 — Order notifications: asynchronous delivery path'
+    include customer, shop.api, shop.broker, shop.worker
+  }
+}

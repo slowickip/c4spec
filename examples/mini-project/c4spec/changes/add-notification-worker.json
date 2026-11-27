@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "id": "add-notification-worker",
+  "intent": "Move order notification delivery out of the request path. Notification sending has an independent responsibility and its own failure modes (provider latency, retries, backoff), so it becomes a runnable consumer plus an independently running message broker rather than code inside shop.api. Proposed only: none of this is implemented.",
+  "scope": [
+    "shop.api",
+    "shop.broker",
+    "shop.worker"
+  ],
+  "constraints": [
+    {
+      "id": "notification-off-request-path",
+      "statement": "An order MUST be recorded before the API responds, and customer notification delivery MUST happen outside the request path with independent retries.",
+      "durability": "change-only",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_notification_flow.py"
+      ]
+    }
+  ],
+  "alternatives": [
+    {
+      "id": "inline-in-api",
+      "title": "Send the notification synchronously inside shop.api",
+      "tradeoff": "No new containers and no broker to operate. Rejected: provider latency and outages land in the checkout path, a failed send has no retry surface, and a slow provider becomes a checkout incident."
+    },
+    {
+      "id": "transactional-outbox",
+      "title": "Outbox table in the product database plus a relay process",
+      "tradeoff": "Strongest guarantee (no lost events even if publishing fails mid-transaction), but it needs a relay worker and a migration on the existing database, so it is a later evolution of this design rather than the first step."
+    },
+    {
+      "id": "worker-with-queue",
+      "title": "Independent RabbitMQ broker container plus a notification worker (chosen)",
+      "tradeoff": "Adds two runnable units to operate and monitor. Buys isolation: the API only publishes, delivery retries are independent, and a provider outage drains when the provider returns. Accepted for the first step."
+    }
+  ],
+  "decision": "worker-with-queue",
+  "rationale": "The responsibility (deliver notifications, retry, back off) is independent of serving customer requests, which is exactly the C4 container criterion: separately runnable, separately deployable, separately failing. The RabbitMQ broker is modeled as a container because it is an independently running system component with persistent message storage; an individual RabbitMQ queue is not independently deployable.",
+  "openQuestions": [
+    "Delivery guarantee: at-least-once is assumed; where notification de-duplication lives is undecided.",
+    "Retry cap, backoff schedule and dead-letter handling are not specified by this proposal.",
+    "Whether the worker sends directly over SMTP or through a provider API is left open; the model shows a single outbound notification relationship to the customer."
+  ],
+  "evidence": [
+    {
+      "element": "shop.worker",
+      "path": "tests/test_notification_flow.py",
+      "state": "planned",
+      "note": "Planned acceptance test for publish-before-respond and independent retry. Nothing is implemented: this path does not exist yet, and completion checks must fail until it does."
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "id": "require-tls-for-db",
+  "intent": "Enforce TLS on the existing shop.api -> shop.db connection in configuration only. Transport encryption is a property of that existing relationship, not a new building block, so the architecture model does not change: zero C4 delta — configuration detail of shop.api.",
+  "scope": [
+    "shop.api"
+  ],
+  "constraints": [
+    {
+      "id": "db-connection-tls",
+      "statement": "Connections from shop.api to shop.db MUST use TLS and MUST NOT permit a plaintext fallback mode (disable, allow, prefer).",
+      "durability": "persistent",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_db_config.py"
+      ]
+    }
+  ],
+  "alternatives": [
+    {
+      "id": "model-tls-terminator",
+      "title": "Add a TLS terminator container between shop.api and shop.db",
+      "tradeoff": "Would show encryption on the diagram, but there is no such deployment unit: TLS is negotiated by the PostgreSQL client inside shop.api and the server. Inventing a node would misrepresent the deployment and duplicate the existing relationship."
+    },
+    {
+      "id": "relabel-relation-technology",
+      "title": "Change the relationship technology from 'SQL' to 'SQL over TLS'",
+      "tradeoff": "Cheap, but it makes the graph restate configuration. The next config change (verify-full, certificate rotation) would have to edit the model again, and the value would drift exactly like the Cilium version did. The relation stays 'SQL'."
+    },
+    {
+      "id": "config-only-constraint",
+      "title": "Keep the graph untouched; record the obligation as a constraint",
+      "tradeoff": "No visual signal of encryption on the diagram. Payoff: one owner for the fact (configuration), a constraint that survives refactors, and zero model churn."
+    }
+  ],
+  "decision": "config-only-constraint",
+  "rationale": "The structural question was asked and answered: no new element, no new relationship, no boundary change. What changes is which connection parameters the application accepts, which is configuration. The obligation is durable and testable, so it belongs in the constraint register rather than in a node.",
+  "openQuestions": [
+    "This change requires encryption (sslmode=require) but not certificate-chain verification. Moving to verify-full is a separate security decision with its own trust anchor; not assumed here."
+  ],
+  "evidence": [
+    {
+      "element": "shop.api",
+      "path": "tests/test_db_config.py",
+      "state": "declared",
+      "note": "Test source exists. Its execution result is recorded in the verify phase and in CI; the file's presence is not proof that the tests pass."
+    },
+    {
+      "element": "shop.api",
+      "path": "app/db_config.py",
+      "state": "declared",
+      "note": "The configuration surface being constrained. Only this module builds the DSN for the modeled shop.api -> shop.db link."
+    }
+  ]
+}

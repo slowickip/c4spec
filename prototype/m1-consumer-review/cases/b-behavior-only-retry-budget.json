@@ -1,0 +1,42 @@
+{
+  "id": "B",
+  "slug": "b-behavior-only-retry-budget",
+  "title": "Behavior-only: read retry budget with declared and planned evidence",
+  "change": "c4spec/changes/read-retry-budget.json",
+  "views": [],
+  "edits": [
+    {
+      "path": "app/product_reads.py",
+      "append": "# Change `read-retry-budget` (fixture): a cache lookup retries at most twice before the\n# database path is taken. The wrapper is the behaviour; the test observes attempts and\n# the single database fallback.\nREAD_ATTEMPTS_BUDGET = 2\n\n\nclass BoundedCacheRetry:\n    \"\"\"Retry a failing cache at most `budget` times, then report the cache as unavailable.\"\"\"\n\n    def __init__(self, inner: CacheAdapter, budget: int = READ_ATTEMPTS_BUDGET) -> None:\n        if budget < 1:\n            raise ValueError(\"budget must be at least one attempt\")\n        self._inner = inner\n        self.budget = budget\n        self.attempts = 0\n\n    def get(self, product_id: str) -> Optional[Dict[str, Any]]:\n        last: Optional[BaseException] = None\n        for _ in range(self.budget):\n            self.attempts += 1\n            try:\n                return self._inner.get(product_id)\n            except (RuntimeError, TimeoutError, OSError) as exc:\n                last = exc\n        raise last if last is not None else RuntimeError(\"cache produced no attempt\")"
+    }
+  ],
+  "files": {
+    "c4spec/changes/read-retry-budget.json": "files/change.json",
+    "tests/test_read_budget.py": "files/test_read_budget.py"
+  },
+  "likec4Config": {
+    "name": "mini-shop"
+  },
+  "changeRevision": "head",
+  "checkModel": "head",
+  "expect": {
+    "delta": {
+      "elements": 0,
+      "relationships": 0,
+      "views": 0
+    },
+    "proposalExit": 0,
+    "proposalErrorCodes": [],
+    "proposalWarningCodes": [
+      "planned_path"
+    ],
+    "completionExit": 1,
+    "completionErrorCodes": [
+      "still_planned",
+      "missing_path"
+    ],
+    "renderExit": 0,
+    "testsExit": 0,
+    "testsRan": 26
+  }
+}

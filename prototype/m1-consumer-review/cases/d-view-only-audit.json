@@ -1,0 +1,39 @@
+{
+  "id": "D",
+  "slug": "d-view-only-audit",
+  "title": "View-only: focused audit view, zero element/relationship delta",
+  "change": "c4spec/changes/add-audit-view.json",
+  "views": [
+    "payments-audit"
+  ],
+  "edits": [
+    {
+      "path": "architecture/shop.c4",
+      "find": "  view notifications {\n    title 'L2 \u2014 Order notifications: asynchronous delivery path'\n    include customer, shop.api, shop.broker, shop.worker\n  }\n",
+      "replace": "  view notifications {\n    title 'L2 \u2014 Order notifications: asynchronous delivery path'\n    include customer, shop.api, shop.broker, shop.worker\n  }\n\n  view payments-audit {\n    title 'L2 \u2014 Payments audit: existing containers only'\n    include customer, shop.api, shop.db\n  }\n"
+    }
+  ],
+  "files": {
+    "c4spec/changes/add-audit-view.json": "files/change.json"
+  },
+  "likec4Config": {
+    "name": "mini-shop"
+  },
+  "changeRevision": "head",
+  "checkModel": "head",
+  "expect": {
+    "delta": {
+      "elements": 0,
+      "relationships": 0,
+      "views": 1
+    },
+    "proposalExit": 0,
+    "proposalErrorCodes": [],
+    "proposalWarningCodes": [],
+    "completionExit": 0,
+    "completionErrorCodes": [],
+    "renderExit": 0,
+    "testsExit": 0,
+    "testsRan": 22
+  }
+}

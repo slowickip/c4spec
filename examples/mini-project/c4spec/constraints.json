@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "constraints": [
+    {
+      "id": "cache-fallback",
+      "statement": "Read requests succeed against the database when cache is unavailable.",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_cache_fallback.py"
+      ]
+    },
+    {
+      "id": "cache-ttl-bound",
+      "statement": "A cached product read MUST NOT be served when its entry age exceeds 300 seconds.",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_order_cache.py"
+      ]
+    },
+    {
+      "id": "db-connection-tls",
+      "statement": "Connections from shop.api to shop.db MUST use TLS and MUST NOT permit a plaintext fallback mode (disable, allow, prefer).",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_db_config.py"
+      ]
+    }
+  ]
+}

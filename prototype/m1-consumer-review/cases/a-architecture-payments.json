@@ -1,0 +1,51 @@
+{
+  "id": "A",
+  "slug": "a-architecture-payments",
+  "title": "Architecture: payment adapter container, directed relation and focused view",
+  "change": "c4spec/changes/add-payments-adapter.json",
+  "views": [
+    "checkout-path"
+  ],
+  "edits": [
+    {
+      "path": "architecture/shop.c4",
+      "find": "    db = container 'Product Database' {\n      technology 'PostgreSQL'\n      description 'Stores products and purchase data'\n    }\n",
+      "replace": "    db = container 'Product Database' {\n      technology 'PostgreSQL'\n      description 'Stores products and purchase data'\n    }\n\n    pay = container 'Payment Gateway Adapter' {\n      technology 'Python (HTTP client)'\n      description 'Authorizes card payments through an external PSP; the shop never stores card data'\n    }\n"
+    },
+    {
+      "path": "architecture/shop.c4",
+      "find": "  shop.api -> shop.db 'Reads and writes products' 'SQL'\n",
+      "replace": "  shop.api -> shop.db 'Reads and writes products' 'SQL'\n  shop.api -> shop.pay 'Authorizes card payments' 'HTTPS'\n"
+    },
+    {
+      "path": "architecture/shop.c4",
+      "find": "  view notifications {\n    title 'L2 \u2014 Order notifications: asynchronous delivery path'\n    include customer, shop.api, shop.broker, shop.worker\n  }\n",
+      "replace": "  view notifications {\n    title 'L2 \u2014 Order notifications: asynchronous delivery path'\n    include customer, shop.api, shop.broker, shop.worker\n  }\n\n  view checkout-path {\n    title 'L2 \u2014 Checkout: payment authorization path'\n    include customer, shop.api, shop.pay\n  }\n"
+    }
+  ],
+  "files": {
+    "c4spec/changes/add-payments-adapter.json": "files/change.json",
+    "app/payments.py": "files/payments.py",
+    "tests/test_payments.py": "files/test_payments.py"
+  },
+  "likec4Config": {
+    "name": "mini-shop"
+  },
+  "changeRevision": "head",
+  "checkModel": "head",
+  "expect": {
+    "delta": {
+      "elements": 1,
+      "relationships": 1,
+      "views": 1
+    },
+    "proposalExit": 0,
+    "proposalErrorCodes": [],
+    "proposalWarningCodes": [],
+    "completionExit": 0,
+    "completionErrorCodes": [],
+    "renderExit": 0,
+    "testsExit": 0,
+    "testsRan": 25
+  }
+}

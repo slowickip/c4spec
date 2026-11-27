@@ -1,0 +1,126 @@
+name: Native LikeC4 diff-first rehearsal
+on:
+  pull_request:
+    paths:
+      - 'prototype/native-diff-first/**'
+      - 'examples/mini-project/architecture/shop.c4'
+      - '.agents/skills/c4spec*/**'
+      - '.github/workflows/native-diff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-diff:
+    # Teaching fixture regression checks and review artifacts, with read-only access.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Bind review evidence to the exact PR source commit
+        env:
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$REVIEW_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify installed C4Spec-owned LikeC4 guidance
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/c4spec-owned-guidance"
+          mkdir -p "$target"
+          (cd "$target" && npx --yes skills@1.8.1 add "$GITHUB_WORKSPACE" --skill '*' -a claude-code -y)
+          guide="$target/.claude/skills/c4spec/references/likec4"
+          test -f "$guide/README.md"
+          test -f "$guide/diffs.md"
+          test -f "$guide/LICENSE.txt"
+          test ! -e "$target/.claude/skills/likec4-dsl"
+          test "$(npx --yes likec4@1.61.0 --version)" = '1.61.0'
+          python3 tests/validate_likec4_references.py --guide "$guide" --version 1.61.0
+          npx --yes likec4@1.61.0 validate --json --no-layout "$guide/example"
+          npx --yes likec4@1.61.0 export json --skip-layout -o "$RUNNER_TEMP/c4spec-guidance.json" "$guide/example"
+          python3 - <<'PY_CHECK'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(os.environ["GITHUB_WORKSPACE"]) / ".agents/skills/c4spec/scripts"))
+          from diff import select_project
+          data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "c4spec-guidance.json").read_text())
+          model = select_project(data, "c4spec-guidance")
+          assert set(model["elements"]) == {"customer", "shop", "shop.ui", "shop.api", "shop.db"}
+          assert model["elements"]["shop.api"]["style"]["icon"] == "md:api"
+          assert "Collects customer orders" in model["elements"]["shop.ui"]["description"]["md"]
+          assert {n["id"] for n in model["views"]["owned-services"]["nodes"]} == {"shop.api"}
+          assert {n["id"] for n in model["views"]["containers"]["nodes"]} == {"customer", "shop.ui", "shop.api", "shop.db"}
+          assert model["views"]["order-flow"]["flow"]
+          assert {n["id"] for n in model["views"]["production"]["nodes"]} == {"prod.app", "prod.app.ui", "prod.app.api", "prod.data", "prod.data.db"}
+          PY_CHECK
+      - name: Test scratch-model construction
+        run: python3 -m unittest discover -s prototype/native-diff-first -p 'test_*.py' -v
+      - name: Exercise pinned published native diff CLI
+        run: |
+          set -euo pipefail
+          python3 prototype/native-diff-first/rehearse.py --out "$RUNNER_TEMP/c4spec-native-diff"
+      - name: Export machine-readable As-is and To-be view graphs
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/c4spec-native-diff"
+          work="$RUNNER_TEMP/c4spec-inline"
+          mkdir -p "$work"
+          # Compute-only JSON export of the same two states the native CLI
+          # diffs; this is provider output, not a second architecture model.
+          (cd "$out/proposal" && npx --yes likec4@1.61.0 export json --skip-layout -o "$work/asis.json" .)
+          (cd "$out/applied" && npx --yes likec4@1.61.0 export json --skip-layout -o "$work/tobe.json" .)
+      - name: Render inline Mermaid overlay for the Actions summary
+        env:
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/c4spec-native-diff"
+          work="$RUNNER_TEMP/c4spec-inline"
+          diff_name="$(jq -r '.diff' "$out/summary.json")"
+          if python3 prototype/native-diff-first/inline_diff.py \
+              --asis-json "$work/asis.json" --tobe-json "$work/tobe.json" \
+              --diff-list "$out/diff-list.json" --diff "$diff_name" \
+              --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" \
+              --sha "$REVIEW_SHA" > "$work/inline.md" 2> "$work/inline.err"; then
+            exit 0
+          fi
+          # Refusing is the designed outcome for unsupported or non-faithful
+          # cases. Say so in the summary instead of shipping a wrong diagram;
+          # the counts and the interactive artifact remain authoritative.
+          echo "::warning::inline overlay refused for $diff_name"
+          head -5 "$work/inline.err"
+          {
+            printf '%s\n\n' "**Inline red/green Mermaid overlay unavailable for this diff.**"
+            printf '%s\n' "The per-view counts above and the interactive artifact are the"
+            printf '%s\n' "authoritative comparison; no diagram is guessed."
+          } > "$work/inline.md"
+      - name: Generate the teaching fixture summary for Actions
+        env:
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/c4spec-native-diff"
+          python3 prototype/native-diff-first/review_comment.py \
+            --diff-list "$out/diff-list.json" --summary "$out/summary.json" \
+            --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" \
+            --sha "$REVIEW_SHA" --inline-section "$RUNNER_TEMP/c4spec-inline/inline.md" \
+            > "$out/review-comment.md"
+          cat "$out/review-comment.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish temporary proposal and applied model for human visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-diff-as-is-changes-to-be
+          path: ${{ runner.temp }}/c4spec-native-diff/
+          if-no-files-found: warn
+          retention-days: 7

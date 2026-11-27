@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "read-retry-budget",
+  "intent": "Bound product-read retries so a degraded cache cannot multiply database load during an incident.",
+  "scope": [
+    "shop.api"
+  ],
+  "constraints": [
+    {
+      "id": "read-retry-budget",
+      "durability": "change-only",
+      "statement": "A product read MUST make at most two cache attempts before falling back to the database, and MUST NOT retry the database read inside one request.",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_read_budget.py"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "element": "shop.api",
+      "path": "app/product_reads.py",
+      "state": "declared",
+      "note": "Fixture read path with the retry budget constant; no network."
+    },
+    {
+      "element": "shop.api",
+      "path": "tests/test_read_budget.py",
+      "state": "declared",
+      "note": "Executable fixture test; the structural check does not run it."
+    },
+    {
+      "element": "shop.api",
+      "path": "tests/test_retry_escalation.py",
+      "state": "planned",
+      "note": "Escalation/alerting test is not written yet; completion must fail until it exists."
+    }
+  ],
+  "openQuestions": [
+    "Is the budget per request or per product id under concurrent reads?"
+  ]
+}

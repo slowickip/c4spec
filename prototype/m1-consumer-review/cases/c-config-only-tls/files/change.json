@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "tls-defaults-hardening",
+  "intent": "Make the accepted TLS mode explicit per environment instead of relying on one process-wide default.",
+  "scope": [
+    "shop.db"
+  ],
+  "constraints": [
+    {
+      "id": "tls-defaults",
+      "durability": "change-only",
+      "statement": "Production database connections MUST use verify-full; a weaker mode MUST fail configuration loading.",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_tls_defaults.py"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "element": "shop.api",
+      "path": "app/db_config.py",
+      "state": "declared",
+      "note": "Configuration table added to the existing TLS fixture."
+    },
+    {
+      "element": "shop.api",
+      "path": "tests/test_tls_defaults.py",
+      "state": "declared",
+      "note": "Fixture test over the table; execution is not claimed by the structural check."
+    }
+  ],
+  "openQuestions": [
+    "Does staging keep `require`, or must it also move to verify-full before the next release?"
+  ]
+}

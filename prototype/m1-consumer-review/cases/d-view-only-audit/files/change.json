@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "add-audit-view",
+  "intent": "Give reviewers a focused audit view of the existing read path without changing the model.",
+  "scope": [
+    "shop.api",
+    "shop.db"
+  ],
+  "evidence": [
+    {
+      "element": "shop.api",
+      "path": "architecture/shop.c4",
+      "state": "declared",
+      "note": "View source only; no element or relationship is added, removed or modified."
+    }
+  ],
+  "openQuestions": [
+    "Should the audit view include the broker path once notification delivery is implemented?"
+  ]
+}

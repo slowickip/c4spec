@@ -1,0 +1,84 @@
+// Runnable C4Spec guidance fixture; LikeC4 1.61.0.
+specification {
+  element person
+  element system
+  element container
+  relationship sync {
+    color blue
+    line solid
+  }
+  deploymentNode environment
+  deploymentNode vm
+  tag critical
+}
+model {
+  customer = person 'Customer' {
+    description 'Uses the order service'
+  }
+  shop = system 'Online Shop' {
+    description 'Accepts and stores customer orders'
+    ui = container 'Web UI' {
+      descriptionFile ./ui-description.md
+      technology 'Browser application'
+    }
+    api = container 'Order API' {
+      #critical
+      description 'Validates and records orders'
+      technology 'HTTP service'
+      icon md:api
+      metadata {
+        owner 'orders'
+      }
+    }
+    db = container 'Order Database' {
+      description 'Stores accepted orders'
+      technology 'PostgreSQL'
+      style {
+        shape storage
+      }
+    }
+    ui -[sync]-> api 'submits order' {
+      technology 'HTTPS'
+    }
+    api -[sync]-> db 'stores order' {
+      technology 'SQL'
+    }
+  }
+  customer -> shop.ui 'places order'
+}
+views {
+  view context {
+    title 'L1 — Online Shop: context'
+    include *
+  }
+  view containers of shop {
+    title 'L2 — Online Shop: containers'
+    include customer, shop.*
+  }
+  view owned-services {
+    title 'L2 — Online Shop: owned services'
+    include shop.* where metadata.owner is 'orders'
+  }
+  dynamic view order-flow {
+    title 'Order submission'
+    customer -> shop.ui 'places order'
+    shop.ui -> shop.api 'submits order'
+    shop.api -> shop.db 'stores order'
+    shop.ui <- shop.api 'accepted'
+  }
+  deployment view production {
+    title 'Production deployment'
+    include prod.**
+  }
+}
+deployment {
+  prod = environment 'Production' {
+    app = vm 'Application host' {
+      instanceOf shop.ui
+      instanceOf shop.api
+    }
+    data = vm 'Database host' {
+      instanceOf shop.db
+    }
+  }
+}

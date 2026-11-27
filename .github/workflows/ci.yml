@@ -1,0 +1,236 @@
+name: C4Spec MVP
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  cli:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.23.3', '24.x', '26.x']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Install the packed CLI and validate models
+        if: matrix.node == '22.23.3'
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(mktemp -d)"
+          npm pack --pack-destination "$temp"
+          npm install --omit=dev --prefix "$temp/installed" "$temp"/*.tgz
+          package="$temp/installed/node_modules/@slowickip/c4spec"
+          for file in README.md CONTRIBUTING.md SECURITY.md CHANGELOG.md docs/consumer-guide.md \
+            .github/workflows/pr-model-diff.yml scripts/pr_model_diff.py prototype/native-diff-first/inline_diff.py; do
+            test -s "$package/$file"
+          done
+          python3 "$package/scripts/pr_model_diff.py" --help
+          cli="$temp/installed/node_modules/.bin/c4spec"
+          "$cli" init "$temp/consumer" --agent codex
+          test -f "$temp/consumer/.agents/skills/c4spec-maintain/SKILL.md"
+          test ! -e "$temp/consumer/.agents/skills/c4spec-propose"
+          "$cli" init "$temp/consumer" --agent codex --profile extended
+          "$cli" --repo "$temp/consumer" doctor
+          "$cli" --repo "$temp/consumer" update --dry-run
+          cmp .agents/skills/c4spec-propose/references/model-first.md \
+            "$temp/consumer/.agents/skills/c4spec-propose/references/model-first.md"
+          for skill in apply continue explore finish maintain propose review verify; do
+            source=".agents/skills/c4spec-$skill"
+            installed="$temp/consumer/$source"
+            cmp LICENSE "$installed/LICENSE"
+            cmp "$source/NOTICE" "$installed/NOTICE"
+          done
+          "$cli" --repo "$temp/consumer" validate
+          "$cli" --repo "$GITHUB_WORKSPACE" --model-dir architecture validate
+      - run: npm test
+      - name: Exercise PR diagram comments with the pinned compiler
+        if: matrix.node == '22.23.3'
+        run: python3 -m unittest discover -s tests -p 'test_pr_model_diff.py' -v
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install schema validation dependency
+        run: python -m pip install -r .agents/skills/c4spec/requirements.txt
+      - name: Compile Python and run focused tests
+        run: |
+          python -m compileall -q scripts .agents/skills/c4spec/scripts tests
+          python -m unittest discover -s tests -v
+      - name: Validate example records (proposal state)
+        run: |
+          python .agents/skills/c4spec/scripts/check.py --change examples/mini-project/c4spec/changes/add-cache.json --constraints-file examples/mini-project/c4spec/constraints.json --repo-root examples/mini-project --phase proposal > /tmp/c4spec-example-report.json
+      - name: Run the behavior-only example's executable evidence
+        run: python -m unittest discover -s examples/mini-project/tests -v
+  likec4-example:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate example architecture with released LikeC4
+        working-directory: examples/mini-project
+        run: npx --yes likec4@1.60.0 validate
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Generate GitHub-native Mermaid review preview from LikeC4
+        working-directory: examples/mini-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Export only in a disposable copy. Never overwrite/commit project README.
+          scratch="$(mktemp -d)"
+          mkdir -p "$scratch/architecture"
+          cp architecture/shop.c4 "$scratch/architecture/shop.c4"
+          (cd "$scratch" && npx --yes likec4@1.60.0 export markdown)
+          mapfile -t documents < <(find "$scratch" -type f -name 'README.md' | sort)
+          test "${#documents[@]}" -gt 0
+          rendered=0
+          for doc in "${documents[@]}"; do
+            if grep -q '```mermaid' "$doc"; then
+              {
+                echo "## Legacy teaching fixture — As-is preview, not a proposed diff"
+                echo
+                echo "Rendered from the current **.c4 source** using LikeC4 1.60.0."
+                echo "Review the raw .c4 source diff for complete semantics."
+                echo
+                cat "$doc"
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "C4SPEC_PREVIEW=$doc" >> "$GITHUB_ENV"
+              rendered=1
+              break
+            fi
+          done
+          test "$rendered" -eq 1
+          git diff --exit-code -- architecture/shop.c4 README.md
+      - name: Export computed LikeC4 model and check C4Spec proposal
+        working-directory: examples/mini-project
+        run: |
+          python -m pip install -r ../../.agents/skills/c4spec/requirements.txt
+          npx --yes likec4@1.60.0 export json --skip-layout -o /tmp/c4spec-example-model.json
+          python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-example-model.json --change c4spec/changes/add-cache.json --constraints-file c4spec/constraints.json --repo-root . --phase proposal > /tmp/c4spec-example-model-check.json
+          # LikeC4 1.59.4 may repeat an identical project in an array.
+          # The checker and diff helper must share selection semantics.
+          python - <<'PY'
+          import json
+          p = "/tmp/c4spec-example-model.json"
+          d = json.load(open(p, encoding="utf-8"))
+          one = d[0] if isinstance(d, list) else d
+          with open("/tmp/c4spec-duplicate-159-export.json", "w", encoding="utf-8") as f:
+              json.dump([one, one], f)
+          PY
+          python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-duplicate-159-export.json --change c4spec/changes/add-cache.json --constraints-file c4spec/constraints.json --repo-root . --phase proposal > /tmp/c4spec-duplicate-check.json
+          # add-cache is an implemented fixture now: completion must pass structurally,
+          # while the checker still reports that it executed no tests.
+          python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-example-model.json --change c4spec/changes/add-cache.json --constraints-file c4spec/constraints.json --repo-root . --phase completion > /tmp/c4spec-example-completion.json
+          python -c 'import json; r=json.load(open("/tmp/c4spec-example-completion.json")); assert r["valid"], r["errors"]; assert r["errors"] == 0; assert r["testsExecuted"] is False'
+          # The bridge must normalize a real computed view without inventing a diff.
+          python ../../.agents/skills/c4spec/scripts/diff.py --base /tmp/c4spec-example-model.json --head /tmp/c4spec-example-model.json > /tmp/c4spec-real-export-self-diff.json
+          python -c 'import json; r=json.load(open("/tmp/c4spec-real-export-self-diff.json")); assert not r["elements"]["added"] and not r["elements"]["modified"] and not r["relationships"]["added"] and not r["views"]["modified"]'
+      - name: Verify proposed architecture delta against the standalone baseline
+        working-directory: examples/mini-project
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/c4spec-baseline/architecture
+          cp fixtures/before-notifications.c4.fixture /tmp/c4spec-baseline/architecture/shop.c4
+          (cd /tmp/c4spec-baseline && npx --yes likec4@1.60.0 export json --skip-layout -o /tmp/c4spec-base-model.json)
+          python ../../.agents/skills/c4spec/scripts/diff.py --base /tmp/c4spec-base-model.json --head /tmp/c4spec-example-model.json > /tmp/c4spec-proposal-diff.json
+          python - <<'PY'
+          import json
+          report = json.load(open("/tmp/c4spec-proposal-diff.json"))
+          assert report["elements"]["added"] == ["shop.broker", "shop.worker"], report
+          assert report["elements"]["addedDetails"]["shop.broker"]["technology"] == "RabbitMQ"
+          assert len(report["relationships"]["added"]) == 3
+          assert report["relationships"]["removed"] == []
+          assert "notifications" in report["views"]["added"]
+          assert report["reviewHints"]  # possible generated index churn is visible, not suppressed
+          PY
+      - name: Applied behavior-only change keeps a zero architecture delta
+        working-directory: examples/mini-project
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/c4spec-apply-base/architecture
+          cp fixtures/before-behavior-change.c4.fixture /tmp/c4spec-apply-base/architecture/shop.c4
+          cmp /tmp/c4spec-apply-base/architecture/shop.c4 architecture/shop.c4
+          (cd /tmp/c4spec-apply-base && npx --yes likec4@1.60.0 export json --skip-layout -o /tmp/c4spec-apply-base-model.json)
+          python ../../.agents/skills/c4spec/scripts/diff.py --base /tmp/c4spec-apply-base-model.json --head /tmp/c4spec-example-model.json > /tmp/c4spec-apply-diff.json
+          python - <<'PY'
+          import json
+          r = json.load(open("/tmp/c4spec-apply-diff.json"))
+          assert r["elements"]["added"] == [] and r["elements"]["modified"] == [] and r["elements"]["removed"] == []
+          assert r["relationships"]["added"] == [] and r["relationships"]["removed"] == []
+          assert r["relationships"].get("modified", []) == []
+          assert r["views"]["added"] == [] and r["views"]["modified"] == []
+          PY
+      - name: Behavior-only example has structurally complete evidence and no model delta
+        working-directory: examples/mini-project
+        run: |
+          python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-example-model.json --change c4spec/changes/expire-cache-entries.json --constraints-file c4spec/constraints.json --repo-root . --phase completion > /tmp/c4spec-behavior-only.json
+          python -c 'import json; r=json.load(open("/tmp/c4spec-behavior-only.json")); assert r["valid"], r["errors"]; assert r["errors"] == 0'
+      - name: Config-only example also completes with zero model delta
+        working-directory: examples/mini-project
+        run: |
+          python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-example-model.json --change c4spec/changes/require-tls-for-db.json --constraints-file c4spec/constraints.json --repo-root . --phase completion > /tmp/c4spec-config-only.json
+          python -c 'import json; r=json.load(open("/tmp/c4spec-config-only.json")); assert r["valid"], r["errors"]; assert r["errors"] == 0; assert r["testsExecuted"] is False'
+      - name: Proposed architecture example validates but cannot complete
+        working-directory: examples/mini-project
+        run: |
+          python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-example-model.json --change c4spec/changes/add-notification-worker.json --constraints-file c4spec/constraints.json --repo-root . --phase proposal > /tmp/c4spec-arch-proposal.json
+          python -c 'import json; r=json.load(open("/tmp/c4spec-arch-proposal.json")); assert r["valid"], r["errors"]; assert r["errors"] == 0; assert {f["code"] for f in r["findings"]} <= {"planned_path"}'
+          # Nothing is implemented, so completion must stay rejected.
+          if python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-example-model.json --change c4spec/changes/add-notification-worker.json --constraints-file c4spec/constraints.json --repo-root . --phase completion > /tmp/c4spec-arch-completion.json; then
+            echo 'ERROR: an unimplemented architecture proposal passed completion checks'
+            exit 1
+          fi
+          grep -q 'still_planned' /tmp/c4spec-arch-completion.json
+  skills-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify full and diagram-maintenance skill installs
+        run: |
+          set -euo pipefail
+          multi="$(mktemp -d)"
+          single="$(mktemp -d)"
+          (cd "$multi" && npx --yes skills@1.8.1 add "$GITHUB_WORKSPACE" --skill '*' -a claude-code -a codex -y)
+          test -f "$multi/.agents/skills/c4spec/SKILL.md"
+          test -f "$multi/.agents/skills/c4spec/scripts/check.py"
+          test -f "$multi/.agents/skills/c4spec/scripts/native_review.py"
+          test -f "$multi/.agents/skills/c4spec/schemas/change.schema.json"
+          test -f "$multi/.agents/skills/c4spec/references/c4-governance.md"
+          test -f "$multi/.agents/skills/c4spec/references/likec4/README.md"
+          test -f "$multi/.agents/skills/c4spec/references/likec4/LICENSE.txt"
+          test -f "$multi/.claude/skills/c4spec/SKILL.md"
+          python -m pip install -r "$multi/.agents/skills/c4spec/requirements.txt"
+          python "$multi/.agents/skills/c4spec/scripts/check.py" --repo-root "$GITHUB_WORKSPACE/examples/mini-project" --change "$GITHUB_WORKSPACE/examples/mini-project/c4spec/changes/add-cache.json" --phase proposal >/tmp/c4spec-skills-install.json
+          (cd "$single" && npx --yes skills@1.8.1 add "$GITHUB_WORKSPACE" --skill c4spec c4spec-maintain -a claude-code -y)
+          cmp "$GITHUB_WORKSPACE/.agents/skills/c4spec-maintain/SKILL.md" "$single/.claude/skills/c4spec-maintain/SKILL.md"
+          test ! -e "$single/.claude/skills/c4spec-propose"
+          test -f "$single/.claude/skills/c4spec/SKILL.md"
+          test -f "$single/.claude/skills/c4spec/scripts/check.py"
+          test -f "$single/.claude/skills/c4spec/scripts/native_review.py"
+          test -f "$single/.claude/skills/c4spec/schemas/change.schema.json"
+          test -f "$single/.claude/skills/c4spec/LICENSE"
+          test -f "$single/.claude/skills/c4spec/references/likec4/README.md"
+          test -f "$single/.claude/skills/c4spec/references/likec4/example/model.c4"
+          python "$single/.claude/skills/c4spec/scripts/check.py" --repo-root "$GITHUB_WORKSPACE/examples/mini-project" --change "$GITHUB_WORKSPACE/examples/mini-project/c4spec/changes/add-cache.json" --phase proposal >/tmp/c4spec-single-agent.json

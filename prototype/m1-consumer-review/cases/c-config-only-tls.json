@@ -1,0 +1,37 @@
+{
+  "id": "C",
+  "slug": "c-config-only-tls",
+  "title": "Configuration-only: per-environment TLS mode table",
+  "change": "c4spec/changes/tls-defaults-hardening.json",
+  "views": [],
+  "edits": [
+    {
+      "path": "app/db_config.py",
+      "append": "# Change `tls-defaults-hardening` (fixture): environments get an explicit TLS mode and\n# the DSN builders enforce it. Production moves to verify-full; staging keeps require.\nENVIRONMENT_SSLMODES = {\"production\": \"verify-full\", \"staging\": \"require\"}\n\n\ndef build_dsn_for_environment(environment: str, *, host: str, database: str, user: str) -> str:\n    \"\"\"Build a DSN whose sslmode is the one the environment declares.\"\"\"\n    try:\n        mode = ENVIRONMENT_SSLMODES[environment]\n    except KeyError as exc:\n        raise ValueError(f\"unknown environment: {environment}\") from exc\n    return build_dsn(host=host, database=database, user=user, sslmode=mode)\n\n\ndef assert_environment_tls(environment: str, dsn: str) -> str:\n    \"\"\"Verify a DSN is at least as strict as the environment requires.\"\"\"\n    mode = assert_tls(dsn)\n    required = ENVIRONMENT_SSLMODES.get(environment)\n    if required is None:\n        raise ValueError(f\"unknown environment: {environment}\")\n    if required == \"verify-full\" and mode != \"verify-full\":\n        raise InsecureConfiguration(f\"{environment} requires verify-full, DSN uses {mode}\")\n    return mode"
+    }
+  ],
+  "files": {
+    "c4spec/changes/tls-defaults-hardening.json": "files/change.json",
+    "tests/test_tls_defaults.py": "files/test_tls_defaults.py"
+  },
+  "likec4Config": {
+    "name": "mini-shop"
+  },
+  "changeRevision": "head",
+  "checkModel": "head",
+  "expect": {
+    "delta": {
+      "elements": 0,
+      "relationships": 0,
+      "views": 0
+    },
+    "proposalExit": 0,
+    "proposalErrorCodes": [],
+    "proposalWarningCodes": [],
+    "completionExit": 0,
+    "completionErrorCodes": [],
+    "renderExit": 0,
+    "testsExit": 0,
+    "testsRan": 27
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "add-payments-adapter",
+  "intent": "Isolate card authorization behind one container so the shop never holds card data, and make the API -> PSP boundary visible in the checkout view.",
+  "scope": [
+    "shop.api",
+    "shop.pay"
+  ],
+  "constraints": [
+    {
+      "id": "no-card-data",
+      "durability": "change-only",
+      "statement": "Card data MUST NOT be stored, logged or modelled inside the shop; only an authorization result crosses the adapter boundary.",
+      "appliesTo": [
+        "shop.pay"
+      ],
+      "verificationRefs": [
+        "tests/test_payments.py"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "element": "shop.pay",
+      "path": "app/payments.py",
+      "state": "declared",
+      "note": "Adapter fixture: authorization call and result mapping. Presence is not proof it runs."
+    },
+    {
+      "element": "shop.pay",
+      "path": "tests/test_payments.py",
+      "state": "declared",
+      "note": "Executable fixture test; execution is recorded separately from this structural check."
+    }
+  ],
+  "alternatives": [
+    {
+      "id": "inline-psp-calls",
+      "title": "Call the PSP directly from shop.api",
+      "tradeoff": "No new container to operate, but card scope, PSP retries and PCI boundaries land inside the request path; a PSP outage becomes a checkout outage."
+    },
+    {
+      "id": "psp-sidecar",
+      "title": "Sidecar proxy next to shop.api",
+      "tradeoff": "Keeps the API code clean, but the boundary is a deployment detail the C4 model cannot express, so reviewers would not see it."
+    },
+    {
+      "id": "adapter-container",
+      "title": "Payment adapter container (chosen)",
+      "tradeoff": "One more unit to deploy and monitor; buys an explicit, reviewable boundary and a separate place to gate card scope."
+    }
+  ],
+  "decision": "adapter-container",
+  "rationale": "Authorization is independently deployable and independently failing, which is the C4 container criterion. The adapter is the only element allowed to speak to the PSP.",
+  "openQuestions": [
+    "Which PSP contract version is pinned, and who rotates the merchant credential?",
+    "Does the adapter store idempotency keys, or is replay protection the API's job?"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "add-cache",
+  "intent": "Reduce read latency while preserving availability if cache fails.",
+  "scope": [
+    "shop.api"
+  ],
+  "constraints": [
+    {
+      "id": "cache-fallback",
+      "statement": "Read requests succeed against the database when cache is unavailable.",
+      "durability": "persistent",
+      "appliesTo": [
+        "shop.api"
+      ],
+      "verificationRefs": [
+        "tests/test_cache_fallback.py"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "element": "shop.api",
+      "path": "tests/test_cache_fallback.py",
+      "state": "declared",
+      "note": "Test source exists at this path (8 cases). Execution is recorded separately from the structural check: run `python3 -m unittest discover -s examples/mini-project/tests` and read the result. The file's presence is not proof that it passes."
+    },
+    {
+      "element": "shop.api",
+      "path": "app/product_reads.py",
+      "state": "declared",
+      "note": "Fixture read path: cache first, database on cache miss or cache failure. In-memory only; no PostgreSQL and no network."
+    }
+  ]
+}
