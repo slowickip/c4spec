@@ -1,0 +1,7 @@
+{
+  "name": "c4spec-diagram-tools",
+  "private": true,
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "12.2.0"
+  }
+}

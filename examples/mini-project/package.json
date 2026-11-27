@@ -1,0 +1,7 @@
+{
+  "name": "c4spec-mini-project",
+  "private": true,
+  "devDependencies": {
+    "likec4": "1.60.0"
+  }
+}

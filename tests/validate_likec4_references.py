@@ -6,6 +6,7 @@ This command validates a candidate version; it never changes compatibility claim
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import tempfile
@@ -15,12 +16,19 @@ from pathlib import Path
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--guide", type=Path, required=True)
-    parser.add_argument("--version", required=True)
+    root = Path(__file__).resolve().parents[1]
+    # An explicit version still supports manual candidate-version testing.
+    parser.add_argument("--version")
     args = parser.parse_args()
-    cli = ["npx", "--yes", f"likec4@{args.version}"]
+    if args.version:
+        cli = ["npx", "--yes", f"likec4@{args.version}"]
+        expected = args.version
+    else:
+        cli = [str(root / "node_modules/.bin/likec4")]
+        expected = json.loads((root / "package.json").read_text())["dependencies"]["likec4"]
     observed = subprocess.check_output([*cli, "--version"], text=True, timeout=120).strip()
-    if observed != args.version:
-        raise SystemExit(f"Expected {args.version}, got {observed!r}")
+    if observed != expected:
+        raise SystemExit(f"Expected {expected}, got {observed!r}")
     count = 0
     with tempfile.TemporaryDirectory(prefix="c4spec-reference-check-") as scratch:
         for path in sorted(args.guide.glob("*.md")):
@@ -42,7 +50,7 @@ def main() -> None:
                 print(f"Validated {path.name} block {number}")
     if not count:
         raise SystemExit("No complete project examples found; check the installed guide path")
-    print(f"LikeC4 {args.version}: {count} complete reference examples passed")
+    print(f"LikeC4 {observed}: {count} complete reference examples passed")
 
 
 if __name__ == "__main__":

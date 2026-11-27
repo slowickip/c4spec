@@ -1,5 +1,7 @@
 # C4Spec
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/slowickip/c4spec/badge)](https://scorecard.dev/viewer/?uri=github.com/slowickip/c4spec)
+
 **C4Spec helps people and agents maintain and review C4 architecture in Git.**
 Both use cases share a versioned **LikeC4 model**, portable modeling guidance
 and visual comparison.

@@ -6,6 +6,23 @@ on:
 permissions:
   contents: read
 jobs:
+  workflow-security:
+    name: Workflow security
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@1b4550e929643b8b26a62303c6bd64814271a4f1 # v0.9.2
+        with:
+          inputs: .github
+          collect: all
+          strict-collection: true
+          version: '1.33.1'
+          advanced-security: false
+          annotations: true
+          online-audits: false
   cli:
     runs-on: ubuntu-latest
     strategy:
@@ -13,8 +30,10 @@ jobs:
       matrix:
         node: ['22.23.3', '24.x', '26.x']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -22,14 +41,15 @@ jobs:
       - name: Install the packed CLI and validate models
         if: matrix.node == '22.23.3'
         shell: bash
-        run: |
+        run: | # zizmor: ignore[adhoc-packages]
           set -euo pipefail
           temp="$(mktemp -d)"
           npm pack --pack-destination "$temp"
           npm install --omit=dev --prefix "$temp/installed" "$temp"/*.tgz
           package="$temp/installed/node_modules/@slowickip/c4spec"
           for file in README.md CONTRIBUTING.md SECURITY.md CHANGELOG.md docs/consumer-guide.md \
-            .github/workflows/pr-model-diff.yml scripts/pr_model_diff.py prototype/native-diff-first/inline_diff.py; do
+            .github/workflows/pr-model-diff.yml scripts/pr_model_diff.py prototype/native-diff-first/inline_diff.py \
+            scripts/diagram-tools/package.json scripts/diagram-tools/package-lock.json; do
             test -s "$package/$file"
           done
           python3 "$package/scripts/pr_model_diff.py" --help
@@ -58,8 +78,10 @@ jobs:
   python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
       - name: Install schema validation dependency
@@ -78,14 +100,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.23.3'
+      - run: npm ci --prefix examples/mini-project
       - name: Validate example architecture with released LikeC4
         working-directory: examples/mini-project
-        run: npx --yes likec4@1.60.0 validate
-      - uses: actions/setup-python@v5
+        run: |
+          "$GITHUB_WORKSPACE/examples/mini-project/node_modules/.bin/likec4" validate
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
       - name: Generate GitHub-native Mermaid review preview from LikeC4
@@ -97,7 +123,7 @@ jobs:
           scratch="$(mktemp -d)"
           mkdir -p "$scratch/architecture"
           cp architecture/shop.c4 "$scratch/architecture/shop.c4"
-          (cd "$scratch" && npx --yes likec4@1.60.0 export markdown)
+          (cd "$scratch" && "$GITHUB_WORKSPACE/examples/mini-project/node_modules/.bin/likec4" export markdown)
           mapfile -t documents < <(find "$scratch" -type f -name 'README.md' | sort)
           test "${#documents[@]}" -gt 0
           rendered=0
@@ -106,7 +132,7 @@ jobs:
               {
                 echo "## Online shop model at this revision"
                 echo
-                echo "Rendered from the current **.c4 source** using LikeC4 1.60.0."
+                echo "Rendered from the current **.c4 source** using LikeC4 $("$GITHUB_WORKSPACE/examples/mini-project/node_modules/.bin/likec4" --version)."
                 echo "Review the raw .c4 source diff for complete semantics."
                 echo
                 cat "$doc"
@@ -122,7 +148,7 @@ jobs:
         working-directory: examples/mini-project
         run: |
           python -m pip install -r ../../.agents/skills/c4spec/requirements.txt
-          npx --yes likec4@1.60.0 export json --skip-layout -o /tmp/c4spec-example-model.json
+          "$GITHUB_WORKSPACE/examples/mini-project/node_modules/.bin/likec4" export json --skip-layout -o /tmp/c4spec-example-model.json
           python ../../.agents/skills/c4spec/scripts/check.py --model-json /tmp/c4spec-example-model.json --change c4spec/changes/add-cache.json --constraints-file c4spec/constraints.json --repo-root . --phase proposal > /tmp/c4spec-example-model-check.json
           # LikeC4 1.59.4 may repeat an identical project in an array.
           # The checker and diff helper must share selection semantics.
@@ -148,7 +174,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/c4spec-baseline/architecture
           cp fixtures/before-notifications.c4.fixture /tmp/c4spec-baseline/architecture/shop.c4
-          (cd /tmp/c4spec-baseline && npx --yes likec4@1.60.0 export json --skip-layout -o /tmp/c4spec-base-model.json)
+          (cd /tmp/c4spec-baseline && "$GITHUB_WORKSPACE/examples/mini-project/node_modules/.bin/likec4" export json --skip-layout -o /tmp/c4spec-base-model.json)
           python ../../.agents/skills/c4spec/scripts/diff.py --base /tmp/c4spec-base-model.json --head /tmp/c4spec-example-model.json > /tmp/c4spec-proposal-diff.json
           python - <<'PY'
           import json
@@ -167,7 +193,7 @@ jobs:
           mkdir -p /tmp/c4spec-apply-base/architecture
           cp fixtures/before-behavior-change.c4.fixture /tmp/c4spec-apply-base/architecture/shop.c4
           cmp /tmp/c4spec-apply-base/architecture/shop.c4 architecture/shop.c4
-          (cd /tmp/c4spec-apply-base && npx --yes likec4@1.60.0 export json --skip-layout -o /tmp/c4spec-apply-base-model.json)
+          (cd /tmp/c4spec-apply-base && "$GITHUB_WORKSPACE/examples/mini-project/node_modules/.bin/likec4" export json --skip-layout -o /tmp/c4spec-apply-base-model.json)
           python ../../.agents/skills/c4spec/scripts/diff.py --base /tmp/c4spec-apply-base-model.json --head /tmp/c4spec-example-model.json > /tmp/c4spec-apply-diff.json
           python - <<'PY'
           import json
@@ -201,19 +227,22 @@ jobs:
   skills-install:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
-      - uses: actions/setup-python@v5
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.23.3'
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
+      - run: npm ci --omit=dev
       - name: Verify full and diagram-maintenance skill installs
         run: |
           set -euo pipefail
           multi="$(mktemp -d)"
           single="$(mktemp -d)"
-          (cd "$multi" && npx --yes skills@1.8.1 add "$GITHUB_WORKSPACE" --skill '*' -a claude-code -a codex -y)
+          (cd "$multi" && "$GITHUB_WORKSPACE/node_modules/.bin/skills" add "$GITHUB_WORKSPACE" --skill '*' -a claude-code -a codex -y)
           test -f "$multi/.agents/skills/c4spec/SKILL.md"
           test -f "$multi/.agents/skills/c4spec/scripts/check.py"
           test -f "$multi/.agents/skills/c4spec/scripts/native_review.py"
@@ -224,7 +253,7 @@ jobs:
           test -f "$multi/.claude/skills/c4spec/SKILL.md"
           python -m pip install -r "$multi/.agents/skills/c4spec/requirements.txt"
           python "$multi/.agents/skills/c4spec/scripts/check.py" --repo-root "$GITHUB_WORKSPACE/examples/mini-project" --change "$GITHUB_WORKSPACE/examples/mini-project/c4spec/changes/add-cache.json" --phase proposal >/tmp/c4spec-skills-install.json
-          (cd "$single" && npx --yes skills@1.8.1 add "$GITHUB_WORKSPACE" --skill c4spec c4spec-maintain -a claude-code -y)
+          (cd "$single" && "$GITHUB_WORKSPACE/node_modules/.bin/skills" add "$GITHUB_WORKSPACE" --skill c4spec c4spec-maintain -a claude-code -y)
           cmp "$GITHUB_WORKSPACE/.agents/skills/c4spec-maintain/SKILL.md" "$single/.claude/skills/c4spec-maintain/SKILL.md"
           test ! -e "$single/.claude/skills/c4spec-propose"
           test -f "$single/.claude/skills/c4spec/SKILL.md"

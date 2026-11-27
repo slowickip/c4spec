@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -15,6 +14,8 @@ jobs:
   version:
     if: github.repository == 'slowickip/c4spec'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    cache-mode: none
     permissions:
       contents: write
       pull-requests: write
@@ -24,12 +25,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
+          package-manager-cache: false
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Create or update Version Packages PR
         id: changesets
@@ -39,15 +42,44 @@ jobs:
           version-script: npm run version:ci
           pr-title: 'chore(release): version packages'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
 
-  publish:
+  verify:
     needs: version
     if: >-
       github.repository == 'slowickip/c4spec' &&
       needs.version.outputs.has_changesets == 'false' &&
       vars.NPM_RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+    steps:
+      - name: Require functional CI and workflow security checks for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          endpoint="repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$GITHUB_SHA&per_page=1"
+          run_id=''
+          for _ in {1..12}; do
+            run_id="$(gh api "$endpoint" --jq '.workflow_runs[0].id // empty')"
+            if [[ -n "$run_id" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          if [[ -z "$run_id" ]]; then
+            echo "::error::C4Spec CI was not found for $GITHUB_SHA"
+            exit 1
+          fi
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status --interval 15
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    cache-mode: none
     permissions:
       contents: write
       id-token: write
@@ -55,14 +87,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
+          package-manager-cache: false
           registry-url: 'https://registry.npmjs.org'
 
-      - run: npm ci
-      - run: npm test
+      - run: npm ci --ignore-scripts
+      - name: Generate CycloneDX runtime SBOM
+        run: npm sbom --sbom-format=cyclonedx --omit=dev > "$RUNNER_TEMP/c4spec.cdx.json"
 
       - name: Publish release and create GitHub release
         id: changesets
@@ -72,10 +107,29 @@ jobs:
           publish-script: npm run release:ci
           create-github-releases: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
 
       - name: Ensure git tag and GitHub release exist
+        id: reconcile
         if: ${{ !cancelled() && (steps.changesets.outcome == 'success' || steps.changesets.outcome == 'failure') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/reconcile-release.mjs
+        run: |
+          gh auth setup-git --hostname github.com
+          node scripts/reconcile-release.mjs
+
+      - name: Attach the SBOM for the published commit
+        if: ${{ !cancelled() && steps.reconcile.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          published_sha="$(npm view "@slowickip/c4spec@$version" gitHead)"
+          if [[ "$published_sha" != "$GITHUB_SHA" ]]; then
+            exit 0
+          fi
+          assets="$(gh release view "v$version" --json assets --jq '.assets[].name')"
+          if ! grep -Fxq 'c4spec.cdx.json' <<< "$assets"; then
+            gh release upload "v$version" "$RUNNER_TEMP/c4spec.cdx.json"
+          fi
