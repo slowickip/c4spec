@@ -15,6 +15,10 @@ model {
     description 'Requests diagram maintenance or proposes architecture changes, runs checks and reviews the resulting model in Git.'
   }
 
+  maintainer = person 'Repository maintainer' {
+    description 'Reviews changes and controls merges into the default branch.'
+  }
+
   c4spec = system 'C4Spec' {
     description 'Helps people and agents maintain current-state diagrams and develop architecture changes in the repository that owns the model.'
 
@@ -26,6 +30,16 @@ model {
     prReview = container 'Pull request diagram review' {
       technology 'GitHub Actions and Python'
       description 'Compares rendered diagrams and attaches PNGs to pull request runs. Manages the visual comment on pull requests from branches in the same repository.'
+    }
+
+    verification = container 'Repository verification' {
+      technology 'GitHub Actions'
+      description 'Runs functional tests, package install checks and workflow security analysis. Reports results for merge and release decisions.'
+    }
+
+    release = container 'Release automation' {
+      technology 'GitHub Actions and Changesets'
+      description 'Prepares version PRs and publishes the CLI after checks pass on the exact release commit. Generates a runtime software bill of materials.'
     }
   }
 
@@ -42,12 +56,18 @@ model {
   }
 
   github = system 'GitHub' {
-    description 'Hosts repositories, pull requests, human reviews and CI results.'
+    description 'Hosts repositories, pull requests, CI results and releases. Enforces branch rules and monitors code, dependencies and secrets.'
+  }
+
+  npmRegistry = system 'npm registry' {
+    description 'Distributes the C4Spec CLI and its provenance. Authorizes publishing through GitHub Actions OIDC.'
   }
 
   contributor -> c4spec.cli 'Sets up and checks a model, then builds review artifacts' 'CLI'
   contributor -> codingAgent 'Requests design and implementation assistance'
   contributor -> github 'Reviews the proposed and implemented changes' 'HTTPS'
+  contributor -> npmRegistry 'Installs the published C4Spec CLI' 'npm CLI'
+  maintainer -> github 'Reviews and merges changes through protected pull requests' 'HTTPS'
   codingAgent -> c4spec 'Loads modeling and development guidance' 'Skill files'
   codingAgent -> c4spec.cli 'Runs model checks and prepares reviews' 'CLI'
   c4spec.cli -> git 'Reads exact revisions and their model source patches' 'Git CLI'
@@ -56,18 +76,30 @@ model {
   c4spec.prReview -> git 'Reads committed models at the merge base and head' 'Git CLI'
   c4spec.prReview -> likec4 'Renders committed diagrams for comparison' 'Pinned LikeC4 CLI'
   c4spec.prReview -> github 'Uploads diagram artifacts and manages comments on same-repository pull requests' 'GitHub API'
+  github -> c4spec.verification 'Starts checks on pull requests and default-branch pushes' 'Actions events'
+  c4spec.verification -> github 'Reports functional and workflow security results' 'GitHub Actions checks'
+  github -> c4spec.release 'Starts release automation on a default-branch push' 'Push event'
+  c4spec.release -> github 'Reads checks for the exact commit and manages version PRs, tags, releases and SBOMs' 'GitHub API'
+  c4spec.release -> npmRegistry 'Publishes the CLI with provenance' 'npm Trusted Publishing via OIDC'
 }
 
 views {
   view index {
     title 'L1 — C4Spec system context'
     description 'Shows who uses C4Spec and the software systems it relies on.'
-    include contributor, c4spec, codingAgent, git, likec4, github
+    include contributor, maintainer, c4spec, codingAgent, git, likec4, github, npmRegistry
   }
 
   view containers of c4spec {
     title 'L2 — C4Spec CLI and pull request review'
     description 'Shows the local CLI and hosted diagram-review workflow and their different dependencies.'
     include *
+    exclude maintainer, npmRegistry, c4spec.verification, c4spec.release
+  }
+
+  view supplyChain of c4spec {
+    title 'L2 — C4Spec release supply chain'
+    description 'Shows who controls merges, where release verification comes from and how the package reaches npm.'
+    include maintainer, github, c4spec, c4spec.verification, c4spec.release, npmRegistry
   }
 }
