@@ -1,6 +1,6 @@
 {
   "name": "@slowickip/c4spec",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "description": "C4Spec command line for LikeC4 models and Git reviews",
   "keywords": [
     "c4spec",
