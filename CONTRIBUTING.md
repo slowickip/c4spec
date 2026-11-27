@@ -37,10 +37,13 @@ prerelease mode ([pre state](.changeset/pre.json)) and
    does not attempt npm publication.
 4. Once `NPM_RELEASE_ENABLED` is set to `'true'` in repository variables, merging
    a version PR runs the `publish` job, publishing `@slowickip/c4spec` via npm
-   OIDC Trusted Publishing (`alpha` dist-tag while in prerelease mode) and
-   reconciling the Git tag and GitHub Release.
+   OIDC Trusted Publishing, tagging `v<version>`, and reconciling the GitHub
+   Release. While C4Spec has only `alpha` releases on npm (no stable release
+   yet), Changesets publishes those alpha releases under the default `latest`
+   dist-tag; separate `alpha` and `latest` dist-tags apply once a stable
+   release exists.
 5. Run `npx changeset pre exit` when graduating from alpha prereleases to
-   stable `latest` releases.
+   stable releases.
 
 First-time npm bootstrap (required once before OIDC Trusted Publishing can be
 enabled on npmjs.com): run `npm publish --access public` for the initial
