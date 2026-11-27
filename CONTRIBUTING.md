@@ -19,7 +19,38 @@ python -m unittest discover -s tests -v
 ```
 
 Keep generated output, including the local virtual environment and review
-packets, outside of commits. Use `npm pack` to check the tarball.
+packets, outside of commits. Use `npm pack` or `npm run check:pack-version` to
+check the tarball.
+
+## Releases
+
+Versioning and npm releases use [Changesets](.changeset/README.md) in `alpha`
+prerelease mode ([pre state](.changeset/pre.json)) and
+[the release workflow](.github/workflows/release.yml):
+
+1. Add a changeset on feature branches when user-facing behavior changes:
+   `npm run changeset`.
+2. Merging to `main` runs the `version` job in `.github/workflows/release.yml`,
+   which opens or updates the `chore(release): version packages` pull request
+   (updating `package.json`, `package-lock.json`, and `CHANGELOG.md`).
+3. While `NPM_RELEASE_ENABLED` is unset or not `'true'`, merging the version PR
+   does not attempt npm publication.
+4. Once `NPM_RELEASE_ENABLED` is set to `'true'` in repository variables, merging
+   a version PR runs the `publish` job, publishing `@slowickip/c4spec` via npm
+   OIDC Trusted Publishing, tagging `v<version>`, and reconciling the GitHub
+   Release. While C4Spec has only `alpha` releases on npm (no stable release
+   yet), Changesets publishes those alpha releases under the default `latest`
+   dist-tag; separate `alpha` and `latest` dist-tags apply once a stable
+   release exists.
+5. Run `npx changeset pre exit` when graduating from alpha prereleases to
+   stable releases.
+
+First-time npm bootstrap (required once before OIDC Trusted Publishing can be
+enabled on npmjs.com): run `npm publish --access public` for the initial
+release, register owner `slowickip`, repository `c4spec`, and workflow filename
+`release.yml` under **Trusted Publisher** in the package settings on
+npmjs.com, and then set the GitHub repository variable `NPM_RELEASE_ENABLED` to
+`true`.
 
 ## Pull requests
 
