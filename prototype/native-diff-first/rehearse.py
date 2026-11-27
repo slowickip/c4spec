@@ -2,7 +2,7 @@
 """Exercise native LikeC4 model diffs without keeping a second architecture model.
 
 Reads the canonical mini-project shop.c4, creates disposable proposal and
-apply worktrees, and executes the published LikeC4 1.61.0 CLI. Never writes to
+apply worktrees, and executes the repository's lockfile-installed LikeC4 CLI. Never writes to
 the authoritative source. Run on a new Git branch to review proposed diffs.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "examples/mini-project/architecture/shop.c4"
-CLI = ["npx", "--yes", "likec4@1.61.0"]
+CLI = ROOT / "node_modules/.bin/likec4"
 DIFF_NAME = "replaceNotifications"
 DIFF = """
 // Native, unapproved architecture proposal. The model above remains AS-IS.
@@ -59,7 +59,7 @@ def proposal_source(original: str) -> str:
 
 def run(cwd: Path, *args: str, expected: int | None = 0) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
-        [*CLI, *args], cwd=cwd, text=True, capture_output=True, check=False, timeout=180
+        [str(CLI), *args], cwd=cwd, text=True, capture_output=True, check=False, timeout=180
     )
     if expected is not None and result.returncode != expected:
         raise AssertionError(
@@ -105,8 +105,9 @@ def main() -> int:
     overlap_dir = output / "overlapping"
     write(proposal_dir, proposal)
     observed_version = run(proposal_dir, "--version").stdout.strip()
-    if observed_version != "1.61.0":
-        raise AssertionError(f"Unexpected LikeC4 version: {observed_version!r}")
+    expected_version = json.loads((ROOT / "package.json").read_text())["dependencies"]["likec4"]
+    if observed_version != expected_version:
+        raise AssertionError(f"Expected LikeC4 {expected_version}, got {observed_version!r}")
 
     run(proposal_dir, "validate")
     diff_list = run(proposal_dir, "diff", "list", "--json").stdout

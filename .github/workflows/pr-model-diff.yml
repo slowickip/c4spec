@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.3'
           cache: npm
       - run: npm ci --omit=dev
       - name: Compare the PR's rendered LikeC4 diagrams
@@ -41,10 +41,10 @@ jobs:
           fi
       - name: Render downloadable PNG diagrams
         if: steps.compare.outputs.has_diagrams == 'true'
-        env:
-          PUPPETEER_SKIP_DOWNLOAD: 'true'
         run: |
           set -euo pipefail
+          tools="$GITHUB_WORKSPACE/scripts/diagram-tools"
+          npm ci --prefix "$tools" --ignore-scripts
           PUPPETEER_EXECUTABLE_PATH="$(command -v google-chrome)"
           export PUPPETEER_EXECUTABLE_PATH
           source="$RUNNER_TEMP/c4spec-pr-model-diff"
@@ -52,7 +52,7 @@ jobs:
           mkdir -p "$rendered"
           cp "$source/diagrams.md" "$rendered/diagrams.md"
           while IFS= read -r name; do
-            npm exec --yes --package @mermaid-js/mermaid-cli@12.2.0 -- mmdc \
+            "$tools/node_modules/.bin/mmdc" \
               -i "$source/$name.mmd" -o "$rendered/$name.png" -b white --scale 2 < /dev/null
           done < "$source/diagram-names.txt"
       - uses: actions/upload-artifact@v4

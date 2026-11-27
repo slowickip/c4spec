@@ -52,7 +52,7 @@ class NativeDiffWorkflowCustodyTests(unittest.TestCase):
         self.assertNotIn("add likec4/likec4", self.rehearsal)
         self.assertIn("c4spec/references/likec4", self.rehearsal)
         self.assertIn("validate --json --no-layout", self.rehearsal)
-        self.assertIn("likec4@1.61.0 --version", self.rehearsal)
+        self.assertIn('node_modules/.bin/likec4" validate', self.rehearsal)
 
     def test_preparer_is_read_only_and_runs_for_forks_and_reverts(self):
         preamble = self.workflow.split("\njobs:", 1)[0]

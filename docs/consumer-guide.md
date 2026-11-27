@@ -77,7 +77,10 @@ to install the pinned compiler. Run its renderer from the consumer checkout
 with full Git history. Pass the C4Spec checkout's `node_modules/.bin/likec4`
 as `--compiler` and set `--model-dir` to each repository-relative LikeC4
 project directory. The renderer loads its helpers and the 1.61.0 pin from
-the C4Spec checkout.
+the C4Spec checkout. To render PNGs, install Mermaid with
+`npm ci --prefix scripts/diagram-tools --ignore-scripts` in the same C4Spec
+checkout, then use its `scripts/diagram-tools/node_modules/.bin/mmdc` with
+the runner’s Chrome. The Mermaid manifest and shrinkwrap ship in the npm package.
 Run the renderer on the `pull_request` event with read-only contents
 permission and without persisted checkout credentials. Restrict the separate
 comment publishing job to same-repository pull requests.

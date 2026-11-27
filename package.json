@@ -50,6 +50,8 @@
     "docs/upstream-reuse.md",
     ".github/workflows/pr-model-diff.yml",
     "scripts/pr_model_diff.py",
+    "scripts/diagram-tools/package.json",
+    "scripts/diagram-tools/npm-shrinkwrap.json",
     "prototype/native-diff-first/inline_diff.py"
   ],
   "scripts": {
