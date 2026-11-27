@@ -6,6 +6,23 @@ on:
 permissions:
   contents: read
 jobs:
+  workflow-security:
+    name: Workflow security
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@1b4550e929643b8b26a62303c6bd64814271a4f1 # v0.9.2
+        with:
+          inputs: .github
+          collect: all
+          strict-collection: true
+          version: '1.33.1'
+          advanced-security: false
+          annotations: true
+          online-audits: false
   cli:
     runs-on: ubuntu-latest
     strategy:
@@ -13,8 +30,10 @@ jobs:
       matrix:
         node: ['22.23.3', '24.x', '26.x']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -22,7 +41,7 @@ jobs:
       - name: Install the packed CLI and validate models
         if: matrix.node == '22.23.3'
         shell: bash
-        run: |
+        run: | # zizmor: ignore[adhoc-packages]
           set -euo pipefail
           temp="$(mktemp -d)"
           npm pack --pack-destination "$temp"
@@ -59,8 +78,10 @@ jobs:
   python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
       - name: Install schema validation dependency
@@ -79,8 +100,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.23.3'
       - run: npm ci --prefix examples/mini-project
@@ -88,7 +111,7 @@ jobs:
         working-directory: examples/mini-project
         run: |
           "$GITHUB_WORKSPACE/examples/mini-project/node_modules/.bin/likec4" validate
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
       - name: Generate GitHub-native Mermaid review preview from LikeC4
@@ -204,11 +227,13 @@ jobs:
   skills-install:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.23.3'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
       - run: npm ci --omit=dev
