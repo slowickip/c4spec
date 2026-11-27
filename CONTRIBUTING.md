@@ -24,24 +24,30 @@ check the tarball.
 
 ## Releases
 
-Versioning and npm releases use [Changesets](.changeset/README.md) and
+Versioning and npm releases use [Changesets](.changeset/README.md) in `alpha`
+prerelease mode ([pre state](.changeset/pre.json)) and
 [the release workflow](.github/workflows/release.yml):
 
 1. Add a changeset on feature branches when user-facing behavior changes:
    `npm run changeset`.
-2. Merging to `main` runs `.github/workflows/release.yml`, which opens or updates
-   the `chore(release): version packages` pull request (updating `package.json`,
-   `package-lock.json`, and `CHANGELOG.md`).
-3. Merging that version PR publishes `@slowickip/c4spec` to npm via OIDC Trusted
-   Publishing and creates the GitHub release.
-4. Maintainers can also trigger a manual `alpha` or `beta` prerelease from
-   `main` via `workflow_dispatch` when changesets are pending.
+2. Merging to `main` runs the `version` job in `.github/workflows/release.yml`,
+   which opens or updates the `chore(release): version packages` pull request
+   (updating `package.json`, `package-lock.json`, and `CHANGELOG.md`).
+3. While `NPM_RELEASE_ENABLED` is unset or not `'true'`, merging the version PR
+   does not attempt npm publication.
+4. Once `NPM_RELEASE_ENABLED` is set to `'true'` in repository variables, merging
+   a version PR runs the `publish` job, publishing `@slowickip/c4spec` via npm
+   OIDC Trusted Publishing (`alpha` dist-tag while in prerelease mode) and
+   reconciling the Git tag and GitHub Release.
+5. Run `npx changeset pre exit` when graduating from alpha prereleases to
+   stable `latest` releases.
 
 First-time npm bootstrap (required once before OIDC Trusted Publishing can be
 enabled on npmjs.com): run `npm publish --access public` for the initial
-release, then register owner `slowickip`, repository `c4spec`, and workflow
-filename `release.yml` under **Trusted Publisher** in the package settings on
-npmjs.com.
+release, register owner `slowickip`, repository `c4spec`, and workflow filename
+`release.yml` under **Trusted Publisher** in the package settings on
+npmjs.com, and then set the GitHub repository variable `NPM_RELEASE_ENABLED` to
+`true`.
 
 ## Pull requests
 

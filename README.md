@@ -11,26 +11,24 @@ and visual comparison.
   phase skills to propose, review, apply and verify changes with LikeC4 as the
   architectural specification.
 
-**Alpha preview (`0.1.0-alpha.3`).** The CLI supports single-repository
+**Alpha preview.** The CLI supports single-repository
 projects using Git, bundled LikeC4 **1.61.0**, and Node.js **22.23.3 or
 later in the 22.x line**, **24.x**, or **26.x**.
 
 ## Install and try the CLI
 
-Install the CLI globally from npm:
+Build and install the CLI from the public repository (npm distribution is
+configured in the release pipeline and will be available as
+`@slowickip/c4spec` once the initial package release is published):
 
 ```bash
-npm install -g @slowickip/c4spec@latest
+git clone https://github.com/slowickip/c4spec.git
+cd c4spec
+npm ci
+npm run build
+npm install --global .
 c4spec version
 ```
-
-Or run without a global install:
-
-```bash
-npx @slowickip/c4spec@latest init --agent codex
-```
-
-To build and install from a source checkout instead, see [Contributing](CONTRIBUTING.md#build-and-test).
 
 From the project whose architecture you want to maintain, choose a skill profile.
 

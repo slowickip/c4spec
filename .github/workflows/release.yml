@@ -3,134 +3,133 @@ name: Release
 on:
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: npm dist-tag for a manual prerelease from main
-        required: false
-        default: alpha
-        type: choice
-        options:
-          - alpha
-          - beta
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
-    if: github.repository == 'slowickip/c4spec' && github.event_name == 'push'
+  version:
+    if: github.repository == 'slowickip/c4spec'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
-      id-token: write
+    outputs:
+      has_changesets: ${{ steps.changesets.outputs.has-changesets }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-          cache: npm
 
       - run: npm ci
-      - run: npm test
 
-      - name: Create or update Version Packages PR, or publish release
+      - name: Create or update Version Packages PR
         id: changesets
-        uses: changesets/action@v2.1.2
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           version-script: npm run version:ci
-          publish-script: npm run release:ci
           pr-title: 'chore(release): version packages'
-          create-github-releases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  prerelease:
-    if: github.repository == 'slowickip/c4spec' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+  publish:
+    needs: version
+    if: >-
+      github.repository == 'slowickip/c4spec' &&
+      needs.version.outputs.has_changesets == 'false' &&
+      vars.NPM_RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-          cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
       - run: npm test
 
-      - name: Compute prerelease version
-        id: version
+      - name: Publish release and create GitHub release
+        id: changesets
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          publish-script: npm run release:ci
+          create-github-releases: true
         env:
-          DIST_TAG: ${{ inputs.tag || 'alpha' }}
-        run: |
-          set -euo pipefail
-          git fetch --tags --force origin
-          npx changeset status --output=changeset-status.json
-          NEXT=$(node -p "JSON.parse(require('fs').readFileSync('changeset-status.json','utf8')).releases[0]?.newVersion ?? ''")
-          rm -f changeset-status.json
-          if [ -z "$NEXT" ]; then
-            echo "No pending changesets on main; nothing to cut a prerelease from."
-            exit 1
-          fi
-          N=1
-          while true; do
-            VERSION="${NEXT}-${DIST_TAG}.${N}"
-            TAG="@slowickip/c4spec@${VERSION}"
-            if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && \
-               ! npm view "@slowickip/c4spec@${VERSION}" version >/dev/null 2>&1; then
-              break
-            fi
-            N=$((N + 1))
-          done
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set prerelease version
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: npm version "$VERSION" --no-git-tag-version
-
-      - name: Verify packed CLI version
-        run: npm run check:pack-version
-
-      - name: Publish prerelease to npm via trusted publishing
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          DIST_TAG: ${{ inputs.tag || 'alpha' }}
-        run: |
-          if npm view "@slowickip/c4spec@${VERSION}" version >/dev/null 2>&1; then
-            echo "@slowickip/c4spec@${VERSION} is already on npm; skipping publish."
-            exit 0
-          fi
-          npm publish --tag "$DIST_TAG"
-
-      - name: Tag and create GitHub prerelease
+      - name: Ensure git tag and GitHub release exist
+        if: ${{ !cancelled() && (steps.changesets.outcome == 'success' || steps.changesets.outcome == 'failure') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-          DIST_TAG: ${{ inputs.tag || 'alpha' }}
         run: |
           set -euo pipefail
-          git tag "$TAG"
-          git push origin "$TAG"
-          gh release create "$TAG" \
-            --prerelease \
-            --generate-notes \
-            --title "$TAG" \
-            --notes "Prerelease. Install with \`npm install -g @slowickip/c4spec@${DIST_TAG}\`."
+          NAME=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).name")
+          VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).version")
+          TAG="${NAME}@${VERSION}"
+
+          if ! npm view "${TAG}" version >/dev/null 2>&1; then
+            echo "${TAG} is not published on npm; skipping tag and release reconciliation."
+            exit 0
+          fi
+
+          git fetch --tags --force origin
+          HEAD_SHA=$(git rev-parse HEAD)
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            TAG_SHA=$(git rev-list -n 1 "${TAG}")
+            if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
+              echo "Tag ${TAG} already exists at ${TAG_SHA} (HEAD is ${HEAD_SHA}); skipping reconciliation."
+              exit 0
+            fi
+          else
+            git tag -a "${TAG}" -m "${TAG}"
+          fi
+
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git push origin "refs/tags/${TAG}"
+          fi
+
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            NOTES_FILE=$(mktemp)
+            node -e '
+              const fs = require("fs");
+              const version = process.argv[1];
+              if (!fs.existsSync("CHANGELOG.md")) process.exit(0);
+              const lines = fs.readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/);
+              const start = lines.indexOf("## " + version);
+              if (start === -1) process.exit(0);
+              let end = lines.findIndex((line, i) => i > start && line.startsWith("## "));
+              if (end === -1) end = lines.length;
+              const body = lines.slice(start + 1, end).join("\n").trim();
+              if (body) fs.writeFileSync(process.argv[2], body + "\n");
+            ' "${VERSION}" "${NOTES_FILE}"
+
+            PRERELEASE_FLAG=""
+            if [[ "${VERSION}" == *-* ]]; then
+              PRERELEASE_FLAG="--prerelease"
+            fi
+
+            if [ -s "${NOTES_FILE}" ]; then
+              gh release create "${TAG}" ${PRERELEASE_FLAG} --title "${TAG}" --notes-file "${NOTES_FILE}"
+            else
+              gh release create "${TAG}" ${PRERELEASE_FLAG} --title "${TAG}" --generate-notes
+            fi
+            rm -f "${NOTES_FILE}"
+          fi

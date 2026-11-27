@@ -50,6 +50,7 @@ jobs:
           done
           "$cli" --repo "$temp/consumer" validate
           "$cli" --repo "$GITHUB_WORKSPACE" --model-dir architecture validate
+      - run: npm run check:pack-version
       - run: npm test
       - name: Exercise PR diagram comments with the pinned compiler
         if: matrix.node == '22.23.3'
