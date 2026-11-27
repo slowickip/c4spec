@@ -17,18 +17,24 @@ later in the 22.x line**, **24.x**, or **26.x**.
 
 ## Install and try the CLI
 
-Build and install the CLI from the public repository (npm distribution is
-configured in the release pipeline and will be available as
-`@slowickip/c4spec` once the initial package release is published):
+Install the published CLI from npm (no source checkout or local TypeScript
+build is required):
 
 ```bash
-git clone https://github.com/slowickip/c4spec.git
-cd c4spec
-npm ci
-npm run build
-npm install --global .
+npm install --global @slowickip/c4spec@latest
 c4spec version
 ```
+
+Alternatively, try the CLI without installing it globally:
+
+```bash
+npx --yes @slowickip/c4spec@latest version
+npx --yes @slowickip/c4spec@latest init --agent codex
+```
+
+C4Spec is currently an alpha preview. Until a stable release is available,
+`latest` tracks the published alpha releases. To build from source for local
+development, see the [contributing guide](CONTRIBUTING.md).
 
 From the project whose architecture you want to maintain, choose a skill profile.
 
