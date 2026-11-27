@@ -49,7 +49,7 @@ jobs:
           package="$temp/installed/node_modules/@slowickip/c4spec"
           for file in README.md CONTRIBUTING.md SECURITY.md CHANGELOG.md docs/consumer-guide.md \
             .github/workflows/pr-model-diff.yml scripts/pr_model_diff.py prototype/native-diff-first/inline_diff.py \
-            scripts/diagram-tools/package.json scripts/diagram-tools/npm-shrinkwrap.json; do
+            scripts/diagram-tools/package.json scripts/diagram-tools/package-lock.json; do
             test -s "$package/$file"
           done
           python3 "$package/scripts/pr_model_diff.py" --help
