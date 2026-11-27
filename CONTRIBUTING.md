@@ -34,10 +34,10 @@ GitHub's Dependency Review checks the dependency diff of every PR and fails on
 new high or critical vulnerabilities. Review applicable license notices when
 adding a dependency. CodeQL scans JavaScript/TypeScript, Python, and Actions on
 PRs, pushes to `main`, and weekly. The `Workflow security` CI job runs zizmor.
-OpenSSF Scorecard evaluates `main` and publishes to code scanning and the
-[public dashboard](https://scorecard.dev/viewer/?uri=github.com/slowickip/c4spec).
+OpenSSF Scorecard evaluates `main` and publishes its results to code scanning
+and the Scorecard dashboard. [Public results](https://scorecard.dev/viewer/?uri=github.com/slowickip/c4spec)
 
-Run workflow checks from the repository root with actionlint and zizmor:
+Run actionlint and zizmor from the repository root.
 
 ```bash
 actionlint -ignore 'unexpected key "cache-mode"'
@@ -48,11 +48,10 @@ The actionlint exclusion accommodates releases that predate GitHub's
 `cache-mode` key. The zizmor exception in CI allows a clean consumer install
 from the npm tarball being tested.
 
-Maintainers triage alerts in [GitHub Security](https://github.com/slowickip/c4spec/security).
-Check which releases and workflows are affected, update dependencies or code
-through a PR, and record the reason for any dismissal. Coordinate unpublished
-vulnerability fixes through GitHub's private advisory process.
-[Reporting instructions](SECURITY.md)
+Triage alerts in GitHub Security. Check which releases and workflows are
+affected, update dependencies or code through a PR, and record the reason
+for any dismissal. Coordinate unpublished vulnerability fixes through the
+private advisory process. [GitHub Security](https://github.com/slowickip/c4spec/security) · [Reporting instructions](SECURITY.md)
 
 ## Releases
 
@@ -85,8 +84,9 @@ built-in GitHub token for release PRs, tags, and assets. Verify an example
 attestation with `npm view @slowickip/c4spec@0.1.0-alpha.4 dist.attestations`.
 
 GitHub's `main-merge-access` ruleset grants merge access to the owner. The
-separate `main-quality` ruleset requires functional CI, resolved review
-conversations, and CodeQL results. Changesets can open version PRs with the
+separate `main-quality` ruleset requires successful functional CI, Dependency
+Review, and zizmor checks. It also requires CodeQL results and resolved review
+conversations. Changesets can open version PRs with the
 built-in token. If GitHub pauses a bot-created PR's checks for approval,
 approve the workflow runs from the PR Checks tab before merging.
 
