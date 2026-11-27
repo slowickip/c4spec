@@ -1,4 +1,4 @@
-name: Native LikeC4 diff-first rehearsal
+name: Native LikeC4 diff checks
 on:
   pull_request:
     paths:
@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   native-diff:
-    # Teaching fixture regression checks and review artifacts, with read-only access.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -104,7 +103,7 @@ jobs:
             printf '%s\n' "The per-view counts above and the interactive artifact are the"
             printf '%s\n' "authoritative comparison; no diagram is guessed."
           } > "$work/inline.md"
-      - name: Generate the teaching fixture summary for Actions
+      - name: Summarize the worker replacement example
         env:
           REVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |

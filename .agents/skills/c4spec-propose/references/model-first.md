@@ -26,8 +26,7 @@ Read the consuming project's `AGENTS.md` and follow its established
 layout rather than forcing a new `c4spec/changes/` tree. Keep durable non-topological constraints in its
 existing register (default `c4spec/constraints.json`) only when not already
 covered by authoritative tests/contracts. If a JSON record is used, pass its
-explicit path to `c4spec validate --change` (or `check.py --change` on the
-legacy path); supply `--constraints-file` only
+explicit path to `c4spec validate --change` or to `check.py --change`. Supply `--constraints-file` only
 when checking an existing durable constraint register. Otherwise do not
 invent a record or configuration file.
 
@@ -93,7 +92,7 @@ CLI review reads committed model sources and local assets under the selected
 directory (root models copy only model sources and config). Use the same
 tool to create and verify its packet.
 
-### Legacy review helper
+### Create and verify a review packet with Python
 
 For an existing installation without the CLI, run the shipped helper from its installed skill directory. `--base` is the
 exact Git merge-base; the proposal must already be committed and model sources
@@ -125,7 +124,7 @@ As-is model; for a native proposal also inspect the applied scratch export.
 
 ## Checks and limitations
 
-Run `c4spec validate` with LikeC4 1.61.0. When using legacy helpers,
+Run `c4spec validate` with LikeC4 1.61.0. When using the Python scripts,
 validate and export JSON with the consumer's pinned LikeC4 version. Run the
 version-matched tools in the shared `c4spec` skill: `scripts/check.py` and
 `scripts/diff.py`. The same skill contains the schemas, requirements and C4

@@ -393,11 +393,8 @@ def render_comment(overlays: list[Overlay], *, repo: str, run_id: int, sha: str,
             "",
         ]
     parts += [
-        "**Verification:** native validate/list/dry-run/apply passed for this diff; the derived",
-        "deltas match LikeC4's reported per-view impact exactly, including effective edges",
-        "removed with a deleted node.",
-        "",
-        "**Scope:** teaching fixture, not a production change, deployment or design approval.",
+        "The diagram counts match LikeC4’s reported per-view impact, including edges"
+        " removed with a deleted node.",
     ]
     return "\n".join(parts) + "\n"
 

@@ -31,16 +31,8 @@ npx --yes skills@1.8.1 add /path/to/c4spec --skill '*' -a claude-code -a codex -
 installs all C4Spec skills. For a remote source, use `OWNER/REPO@COMMIT` with
 the reviewed commit. Verify the installed files and `skills-lock.json`.
 
-**Owned LikeC4 guidance:** the shared `c4spec` skill includes
-`references/likec4/README.md`, topic references, runnable examples and the MIT
-source notice. It is the only C4Spec DSL/CLI instruction bundle; no separate
-`likec4-dsl` install is required. C4Spec declares exactly **1.61.0** compatible.
-Refresh the compiler and owned guidance only after the documented compatibility
-checks pass or the skills/scripts are adjusted to the candidate feature set.
-
-Two consequences worth remembering: a remote install reads the *default branch*
-(or a commit), not an arbitrary feature branch; and the lock file records a
-content hash, which is the standard way to notice that installed skills drifted.
+The shared skill includes the [LikeC4 guidance](../.agents/skills/c4spec/references/likec4/README.md)
+for the pinned compiler. The installer records a content hash in `skills-lock.json`.
 
 ## Install only diagram maintenance
 
@@ -69,52 +61,26 @@ any entries reported as modified, unverified, missing or blocked before
 upgrading. The command exits 1 if it cannot verify the installation or
 finds drift. It uses local files and leaves the checkout and lock file intact.
 
-## What `scripts/install.py` still adds
+## Install skills offline
 
-From a source checkout or source archive, `scripts/install.py` covers two cases
-the Node CLI does not (npm tarball users already have Node and use `c4spec init`):
+From a source checkout, run `python3 scripts/install.py --target <repo>` to
+copy the skills to `<repo>/.agents/skills/`. The Python installer needs no
+network connection. Use `--dry-run` to preview the changes.
 
-1. **Offline, pinned, private copy.** `python3 scripts/install.py --target <repo>`
-   copies this repository's own skill text into `<repo>/.agents/skills/`. No
-   Node, no network, no git auth, no lock file: the content is exactly the
-   checkout you ran it from. Use it in CI setup, air-gapped machines, or a
-   private fork where you do not want a second remote.
-2. **A small offline link fallback.** `--tools auto|all|claude,hermes,…` links
-   the shared copy into the agent folders of four conventions (`claude`,
-   `cursor`, `hermes`, `continue`), relative and clone-safe, with a plain-copy
-   fallback where the filesystem has no symlinks. It never overwrites a skill
-   folder that holds an edit or extra files (`kept-user-edit`), and `--force`
-   replaces it after review.
+For agent-specific locations, pass `--tools auto` or choose from `claude`,
+`cursor`, `hermes` and `continue`. The installer creates relative links
+where supported and copies the skill directory elsewhere. It preserves
+local edits by default. Review the differences before using `--force`.
 
-Default is `--tools none`, so a plain run does not guess which agents you use; it
-prints the `npx skills add` line instead.
+## Installed files
 
-## Bundled assets survive distribution
-
-`c4spec` is a multi-file skill: `SKILL.md` plus `scripts/check.py`,
-`scripts/diff.py`, `schemas/*.json`, `references/` and `requirements.txt`.
-Verified on 2026-11-12 with `skills` 1.8.1 against a fresh checkout — the
-default distribution copies the **whole** folder in both shapes:
-
-| Invocation | Result |
+| Agent selection with skills.sh | Shared skill location |
 | --- | --- |
-| `-a claude-code -a codex` | full copy in `.agents/skills/c4spec/…`, plus a relative symlink `.claude/skills/c4spec` → `../../.agents/skills/c4spec`; the validator runs through the link |
-| `-a claude-code` only | full copy in `.claude/skills/c4spec/…`, no shared store |
+| `-a claude-code -a codex` | `.agents/skills/c4spec/`, linked from `.claude/skills/c4spec` |
+| `-a claude-code` | `.claude/skills/c4spec/` |
 
-The installed validator was executed from the agent folder against
-`examples/mini-project` and returned `valid: true` (`jsonschema` from
-`requirements.txt` installed). `scripts/install.py`'s offline fallback (no
-symlink support) now copies the same tree; before that fix it copied only
-`SKILL.md` and installed a skill whose validator could not run.
-
-## Limitations
-
-- A skill whose text changed keeps the old installed copy classified as a user
-  edit; delete it or re-run with `--force`.
-- The fallback links cover four agent conventions. Use the standard skills
-  CLI for other agents.
-- A private remote install depends on your Git credentials. Local installs
-  use the checkout you pass to the CLI.
+Each installed skill includes its references and other bundled files. The
+shared `c4spec` skill also contains the Python checks and schemas.
 
 ## Checks
 

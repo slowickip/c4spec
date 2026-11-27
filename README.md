@@ -13,35 +13,22 @@ and visual comparison.
 
 **Alpha preview (`0.1.0-alpha.3`).** The CLI supports single-repository
 projects using Git, bundled LikeC4 **1.61.0**, and Node.js **22.23.3 or
-later in the 22.x line**, **24.x**, or **26.x**. Install from a release
-tarball or build from a reviewed source snapshot.
+later in the 22.x line**, **24.x**, or **26.x**.
 
 ## Install and try the CLI
 
-To try the CLI from a release tarball, install it into a scratch directory.
+Build and install the CLI from the public repository.
 
 ```bash
-c4spec_install="$(mktemp -d)"
-npm install --omit=dev --prefix "$c4spec_install" ./slowickip-c4spec-0.1.0-alpha.3.tgz
-"$c4spec_install/node_modules/.bin/c4spec" version
-```
-
-Or install the tarball into a project's `devDependencies` (`npm install --save-dev ./slowickip-c4spec-0.1.0-alpha.3.tgz` and run `npx c4spec version`).
-
-From a reviewed C4Spec source checkout or source archive:
-
-```bash
+git clone https://github.com/slowickip/c4spec.git
+cd c4spec
 npm ci
 npm run build
-node bin/c4spec.js version
+npm install --global .
+c4spec version
 ```
 
-The build compiles the TypeScript CLI to JavaScript. After building, you can
-run `node bin/c4spec.js --help` directly from the checkout, or run `npm pack`
-to build a distributable `.tgz` tarball.
-From a project directory, choose the skills for your agent (substitute
-`node /path/to/c4spec/bin/c4spec.js` or `$c4spec_install/node_modules/.bin/c4spec`
-for `c4spec` if not on `PATH`):
+From the project whose architecture you want to maintain, choose a skill profile.
 
 ```bash
 c4spec init --agent codex                     # basic profile, the default
@@ -139,15 +126,16 @@ together. [Consumer guide](docs/consumer-guide.md)
 
 ## C4 levels: L1, L2 and L3
 
-C4Spec uses the standard C4 **zoom levels**, not three phases of specification work:
-
 | Level | Question to answer | Typical scope |
 | --- | --- | --- |
 | **L1 — System Context** | Who uses the system, and which external systems connect to it? | One software system, people and neighboring systems |
 | **L2 — Container** | What major applications and data stores make up this system? | APIs, workers, databases and brokers, with relationships |
 | **L3 — Component** | What significant internal parts make up one selected container? | Logical components and responsibilities *inside* one application |
 
-L4 (code-level detail) is optional. **You don't have to model every level**: start with context and containers, and add components only when the extra detail helps a review. A C4 *container* is a running application or data store, **not necessarily a Docker container**. **For structural views, put `L1 —`, `L2 —`, or `L3 —` at the start of the visible LikeC4 `title`**, so it appears directly in the diagram and navigation. Keep the `view` ID stable and don't mislabel focused, dynamic or deployment views. See the [canonical modeling guidance](.agents/skills/c4spec/references/c4-governance.md) (and [docs/c4-governance.md](docs/c4-governance.md)); a worked level mapping is in `examples/mini-project/README.md` in a source checkout or archive.
+Start with context and container views. Add a component view when reviewers need
+to understand the internals of one application. Prefix structural view titles
+with `L1 —`, `L2 —` or `L3 —` so the level is visible in the diagram. Keep the
+view ID stable when changing its title. [C4 modeling guidance](docs/c4-governance.md)
 
 ## Model-first workflow
 
@@ -182,39 +170,19 @@ Validate first: `diff list` alone can exit successfully for invalid syntax.
    matches what was reviewed. **`c4spec-finish`** prepares a human-reviewed
    PR and merge. **`c4spec-continue`** resumes from Git and any pending diffs.
 
-For a concrete **replace-one-node** example from a source checkout or archive,
-follow the instructions in `prototype/native-diff-first/README.md`. The
-fixture uses Python and checks preview, apply, invalid syntax and overlapping
-removals with the pinned compiler.
-
-For a committed proposal, `c4spec review` reads the exact Git sources, builds
-the native LikeC4 viewer and records the expected applied sources from a scratch
-copy. Its check modes verify that the committed proposal and applied model still
-match the packet.
-Start with the [consumer guide](docs/consumer-guide.md), which covers installation,
-native changes, direct property/view edits and behavioral verification.
-
-**Compatibility:** Existing projects on 1.60.0 cannot parse native diff
-blocks; keep their direct-branch-edit and optional advisory `diff.py`
-flow until individually upgraded and verified. The optional structured
-change JSON remains only for otherwise-unrepresented non-topological
-requirements; use existing tests/contracts and PRs whenever sufficient.
-
-The phase skills guide the review and implementation decisions. You can
-revisit phases, with the C4 elements and relationships defined in LikeC4.
+For projects pinned to LikeC4 1.60.0, edit the model directly on a Git branch and
+compare the exported models. Native proposals require 1.61.0.
 
 ## Install skills separately
 
-For skills-only installs, use [skills.sh](https://skills.sh/) from the consumer
-and pass the absolute path to the reviewed C4Spec checkout:
+To install just the diagram maintenance skills, run this in your project.
 
 ```bash
-npx --yes skills@1.8.1 add /path/to/c4spec --skill c4spec c4spec-maintain -a codex -y
+npx --yes skills@1.8.1 add slowickip/c4spec --skill c4spec c4spec-maintain -a codex -y
 ```
 
-Use `--skill '*'` for the extended set. Pin the source to a reviewed commit
-and check the installed skill directory and
-`skills-lock.json`. The shared C4Spec skill includes its maintained
+Use `--skill '*'` for the extended set. To pin an installation, use
+`slowickip/c4spec@<full-commit-sha>` and check `skills-lock.json`. The shared C4Spec skill includes its maintained
 [LikeC4 DSL/CLI guidance](.agents/skills/c4spec/references/likec4/README.md).
 **Validated compiler: exactly 1.61.0**; newer releases require compatibility
 validation and any necessary skill/script adjustments before adoption.
@@ -235,45 +203,15 @@ python3 scripts/install.py --target /path/to/your-project --tools auto
 The fallback preserves existing skills unless `--force` is explicitly used.
 For schema checks, install Python 3.10+ and `jsonschema` via
 `pip install -r <installed-c4spec-skill>/requirements.txt`.
-Pin a published LikeC4 release independently. The canonical `.c4` model
-still lives in the consuming project's repository.
+Pin the LikeC4 compiler in your project.
 
-## Legacy scripts and teaching fixtures
+## Contributing
 
-- `examples/mini-project/README.md` (in a source checkout or archive) — teaching project with independently compiled test baselines.
-- `python3 <installed-c4spec-skill>/scripts/check.py --model-json <export.json> --change <change.json> --repo-root <project> --phase proposal`
-- `python3 <installed-c4spec-skill>/scripts/check.py --model-json <export.json> --change <change.json> --repo-root <project> --phase completion`
-- `python3 <installed-c4spec-skill>/scripts/diff.py --base <base-export.json> --head <head-export.json>`
-- `python3 <installed-c4spec-skill>/scripts/provenance.py --model-dir <architecture-dir> --export <abs export.json> --git-commit <40-hex> --compiler-version <pinned LikeC4> --out <provenance.json>`
-- `python3 <installed-c4spec-skill>/scripts/diff.py --base <b.json> --head <h.json> --base-provenance <b-prov.json> --head-provenance <h-prov.json> --repo-root <project>`
-- `python3 <installed-c4spec-skill>/scripts/render_review.py --diff <diff.json> [--check <check.json>] [--change <change.json>] --render <view-id>=<native.png> --html <scratch>/review.html [--markdown <scratch>/review.md]`
-
-First run `likec4 validate`; obtain export JSON with the pinned LikeC4
-version. The diff helper compares a conservative *subset* of computed-model
-semantics, reports modified field values, and hashes normalized before/after model snapshots; it does **not** prove implementation conformance, preserve all view
-selector semantics, or replace Git's raw C4 source diff. No silent automatic
-updates from implementation are permitted.
-
-Published LikeC4 **1.61.0** now supports named `diff` blocks, native
-As-is/Changes/To-be review and `diff apply`: [official model diff docs](https://likec4.dev/dsl/diff/).
-Use the legacy `diff.py` helper for advisory source comparison and projects
-pinned to 1.60.0.
-
-## Repository boundary
-
-In a source checkout or archive, C4Spec manages its own architecture model in
+C4Spec’s own architecture model lives in
 `architecture/c4spec.c4`. From a built source checkout, run
 `node bin/c4spec.js validate --model-dir architecture` or open the diagrams
-with `npm exec -- likec4 start architecture`. Contributor instructions
-are in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for
-vulnerability reporting and [CHANGELOG.md](CHANGELOG.md) for release notes.
-
-Each consuming repository owns its C4 model, tests and configuration. Its code
-and contracts govern behavior. The human reviewer decides whether to approve
-and merge a change.
-
-C4Spec follows the C4 model.
-[The C4 model](https://c4model.com/) · [Diagram review checklist](https://c4model.com/diagrams/checklist)
+with `npm exec -- likec4 start architecture`. See the [contributing guide](CONTRIBUTING.md),
+[security policy](SECURITY.md) and [changelog](CHANGELOG.md).
 
 ## License
 

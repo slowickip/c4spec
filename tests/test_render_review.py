@@ -260,7 +260,7 @@ class HostileAndSafetyTests(PacketCase):
 
 
 class ReviewFindingRegressions(PacketCase):
-    """Negative regressions for the four findings on the first draft of #12."""
+    """Regression checks for review packet rendering."""
 
     def view_only(self):
         diff = diff_document()

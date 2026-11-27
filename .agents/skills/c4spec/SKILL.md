@@ -6,10 +6,7 @@ license: Apache-2.0
 
 # C4Spec shared contract
 
-When developing C4Spec itself, read the source repository README and follow its
-contributor instructions. In a maintainer checkout that includes
-`docs/PROJECT_PLAN.md`, `docs/STATUS.md`, and `docs/decisions.md`, read them for
-the owner’s agreements and current handoff.
+When contributing to C4Spec itself, follow the repository’s `CONTRIBUTING.md`.
 
 Read `references/c4-governance.md` beside this skill and inspect the consuming
 project's `AGENTS.md`, instructions and existing architecture.
@@ -34,8 +31,8 @@ GitHub PR diagram review shows visible render changes.
 **Validated LikeC4 version: 1.61.0.** Newer releases are unverified until
 C4Spec runs compatibility checks and updates its owned skills/scripts for the
 candidate feature set. Do not infer compatibility from a version range or
-silently upgrade a consumer. The existing 1.60.0 fixtures cover legacy direct
-edits only; native diffs require the validated 1.61.0 path.
+silently upgrade a consumer. The 1.60.0 example covers direct model edits.
+Use 1.61.0 for native proposals.
 
 Read [the bundled LikeC4 guide](references/likec4/README.md) before authoring
 models or running the CLI, then load its relevant topic references. C4Spec

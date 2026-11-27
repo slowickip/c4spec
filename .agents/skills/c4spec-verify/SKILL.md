@@ -14,7 +14,7 @@ for model and constraint checks.
 
 - **Model.** Validate with the project's pinned compiler. For a native proposal
   on LikeC4 1.61.0, run `c4spec review --check-applied <review.json>` against
-  the committed result. Use the legacy helper for its own packet format.
+  the committed result. Use `native_review.py` for packets created by that helper.
   Inspect changed source paths and confirm the intended proposal is no longer
   pending. For direct edits, compare the Git patch and computed models.
 - **Behavior.** Locate the implementation and run the project's actual tests

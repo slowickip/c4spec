@@ -1,4 +1,4 @@
-"""Fail-closed outcome checks for the M1 rehearsal (no LikeC4, no network)."""
+"""Outcome checks for the four review cases, using offline inputs."""
 import contextlib
 import io
 import sys

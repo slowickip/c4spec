@@ -15,8 +15,7 @@ and the actual implementation/test evidence.
 - If newly proposed C4 containers/relationships still have **only planned
   evidence**, the branch is a **design proposal, not merge-ready implemented
   architecture**. Keep its PR as a draft; do not silently let the to-be model
-  become the current model on `main`. This applies to the notification-worker
-  teaching fixture and to real consuming repositories.
+  become the current model on `main`.
 - A documentation correction that accurately reflects already-existing code
   may be complete without new implementation, but establish that with source
   evidence and human review; don't claim runtime observation from YAML.

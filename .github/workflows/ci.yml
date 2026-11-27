@@ -1,4 +1,4 @@
-name: C4Spec MVP
+name: C4Spec CI
 on:
   push:
     branches: [main]
@@ -103,7 +103,7 @@ jobs:
           for doc in "${documents[@]}"; do
             if grep -q '```mermaid' "$doc"; then
               {
-                echo "## Legacy teaching fixture — As-is preview, not a proposed diff"
+                echo "## Online shop model at this revision"
                 echo
                 echo "Rendered from the current **.c4 source** using LikeC4 1.60.0."
                 echo "Review the raw .c4 source diff for complete semantics."

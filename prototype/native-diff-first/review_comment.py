@@ -75,10 +75,9 @@ def render_comment(diffs: object, summary: dict, *, repo: str, run_id: int, sha:
     reason = cell(description.get("txt", "")) if isinstance(description, dict) else ""
     link = f"https://github.com/{repo}/actions/runs/{run_id}#artifacts"
     body = [
-        "### Native LikeC4 teaching fixture — compiler regression",
+        "### Notification worker replacement",
         "",
-        "**This generated example exercises the pinned compiler.**"
-        " Actual committed consumer proposals use the installed `native_review.py` helper.",
+        "This example exercises the pinned compiler on the online shop model.",
         "",
         f"**{title}** (__TICK__{cell(name)}__TICK__)",
         f"Intent: {reason}" if reason else "Intent: see proposal source",
@@ -100,16 +99,10 @@ def render_comment(diffs: object, summary: dict, *, repo: str, run_id: int, sha:
         f" Select __TICK__{cell(name)}__TICK__ → **Changes** to see red removals,"
         " green additions and orange modifications. Compare **As-is / Changes / To-be**.",
         "",
-        "The legacy As-is teaching preview remains in the Actions summary."
-        " Any inline overlay below is also generated from this disposable fixture.",
-        "",
         "**Verification:** Native validate/list/dry-run/apply, source preservation,"
         " stale removal and overlap rejection passed in a disposable fixture.",
         "",
-        "**Scope:** This is a teaching fixture, *not* a production change,"
-        " implementation evidence, deployment, or human design approval."
-        " The artifact expires after **7 days**; rerun CI to refresh it."
-        " Inspect the raw PR diff before approving.",
+        "Use the project PR for human design approval. The example artifact expires after 7 days.",
         "",
     ]
     if inline:

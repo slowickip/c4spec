@@ -1,21 +1,14 @@
 # Using C4Spec in an existing project
 
 Keep the project's existing LikeC4 model, code, tests and directory layout.
-Use a feature branch and pin the published compiler. The tested native pin is
-**1.61.0**; compatibility checks still cover direct edits on **1.60.0**.
+Use a feature branch and pin the compiler. C4Spec uses **1.61.0** for native
+proposals and tests direct model edits on **1.60.0**.
 
 ## Install
 
-With Node.js 22.23.3, run this in a reviewed C4Spec checkout:
-
-```bash
-npm ci
-npm run build
-npm install -g .
-cd /path/to/project
-c4spec doctor
-c4spec validate
-```
+Follow the [CLI installation instructions](../README.md#install-and-try-the-cli).
+In a project with an existing model, run `c4spec doctor` to check model
+discovery and `c4spec validate` to compile it.
 
 Use `c4spec init --agent codex claude-code --dry-run` to preview the starter
 model and the default `basic` profile. Omit `--dry-run` to install the shared
@@ -34,10 +27,6 @@ The shared skill bundles C4Spec-maintained DSL/CLI instructions in
 `references/likec4/README.md`; install no separate upstream DSL skill. The
 validated compiler is **exactly 1.61.0**, not an open-ended minimum. Follow the
 bundled upgrade procedure before declaring another release compatible.
-
-When upgrading an earlier installation, retire the redundant `likec4-dsl`
-directory, agent links and lock entry in the reviewed Git change after checking
-for local edits. The C4Spec bundle replaces that separate instruction source.
 
 Check the installed files and `skills-lock.json`. With one agent, skills may
 live directly in its own folder. The CLI also works independently of installed
@@ -110,10 +99,10 @@ when C4Spec owns the model-first design workflow.
 | Add/change a view | Direct source edit; review selectors and computed view membership |
 | Behavior/configuration without architecture impact | Existing code/tests/contracts; zero model delta |
 
-Native 1.61 extensions do **not** accept arbitrary element properties. In a
-consumer pilot, a `technology` edit exposed this behavior:
-`diff list --json` exited 0 while validate/apply rejected the syntax. Always
-validate first. Do not replace a logical node to manufacture a visual diff.
+Run `likec4 validate` before `diff list`. For example, `diff list --json` can
+succeed on a native extension that sets `technology`, even though validation
+and apply reject that change. Edit the existing element directly to preserve
+its identity.
 
 ### Native proposal and review
 
@@ -142,13 +131,9 @@ Use a dedicated model directory if the model needs local assets. With a model
 at the repository root, only LikeC4 sources and configuration are copied.
 Assets outside the selected directory need the project's compiler workflow.
 
-The thin helper supports **one pending native diff**. Isolate or reconcile other
-proposals first. A native dry-run can exit 0 despite overlapping proposals; actual apply rejects
-the overlap. The helper keeps one proposal per packet rather than guessing
-independence or including another pending design in its expected applied result.
-
-Obtain the necessary human design/implementation authorization. Existing
-authorization for a bounded test remains valid; a bot comment is not approval.
+Use one pending native diff per review packet. Resolve overlapping proposals
+before review. LikeC4 can accept an overlap during dry-run and reject it on
+apply. Obtain human authorization before implementing the reviewed change.
 
 ### Authorized apply and verification
 
@@ -167,7 +152,7 @@ the reviewed scratch result. Source or proposal-SHA drift requires renewed
 review; overlapping diffs are not bypassed. Run the project's real tests and
 model/evidence checks separately. The packet never claims tests executed,
 runtime conformance or authenticated human approval. Use the same tool to
-produce and verify a packet. The legacy Python helper has its own format.
+produce and verify a packet. Packets created by `native_review.py` use its own check commands.
 
 ## Direct Git comparison and behavioral obligations
 
@@ -185,8 +170,8 @@ For committed model directory moves, use `c4spec diff --base origin/main --model
 to compare both paths.
 Inspect the raw patch too because computed exports can omit some source
 selectors. A new view with zero element or relationship changes is still a
-real view change. For consumers pinned to 1.60.0, use the version-matched
-[legacy compatibility commands](../README.md#legacy-scripts-and-teaching-fixtures).
+real view change. For a project pinned to 1.60.0, export both revisions with
+that compiler and compare them with the shared skill’s `scripts/diff.py`.
 
 No change JSON is required for model-only checks. If the project has a compact
 record for obligations absent from tests/contracts, pass `--change <path>` and

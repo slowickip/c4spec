@@ -1,11 +1,8 @@
 # LikeC4 guidance maintained by C4Spec
 
-**Validated compiler: LikeC4 1.61.0.** This is an exact compatibility claim,
-not a minimum version or an open-ended range. Newer versions are unverified
-until C4Spec validates them and updates this contract. Use the consumer's
-explicit pin; never silently upgrade it or fall back to `latest` or 1.53.0.
-The existing 1.60.0 mini-project tests cover the legacy direct-edit path only;
-they do not qualify these newer DSL features or native model diffs on 1.60.
+**Validated compiler: LikeC4 1.61.0.** Use the project’s explicit compiler pin.
+Test other versions before adopting them. The LikeC4 1.60.0 example covers
+direct model edits. Native proposals require 1.61.0.
 
 These references are part of the shared `c4spec` skill. C4Spec owns their
 accuracy and updates; no separate `likec4-dsl` skill or live upstream prompt is
@@ -77,7 +74,7 @@ conformance. C4Spec's source-bound helper supports one pending native diff.
 
 The runnable [example project](example/) exercises model, typed relations,
 selector projection, description files, Material icons, dynamic interactions and deployment mapping against the
-exact supported compiler in CI. Existing native rehearsals exercise proposal,
+exact supported compiler in CI. The native diff tests cover proposal,
 dry-run, static review, scratch apply, stale references and overlap rejection.
 CI also compiles complete fenced project examples (those containing both
 `specification` and `model` blocks) from the installed topic references.
@@ -90,8 +87,8 @@ compatibility coverage, not validation of every prose fragment.
    DSL/CLI behavior. Update these owned references for syntax, feature and
    semantic changes; upstream docs/skills are research inputs only.
 2. Change candidate pins together: native helper, rehearsal, CI commands and
-   this guide. Run the complete Python suites, JSON/Python checks, legacy 1.60
-   checks where retained, this example project, native build/apply/negative
+   this guide. Run the complete Python suites, JSON/Python checks, 1.60.0
+   direct-edit checks, this example project, native build/apply/negative
    rehearsals and standard one-/multi-agent installation checks.
 3. Exercise the affected consumer model and inspect As-is/Changes/To-be plus
    original source selectors. Check CLI JSON/exit behavior, source immutability,
